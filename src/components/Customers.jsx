@@ -28,7 +28,8 @@ const Customers = () => {
     phone: '',
     email: '',
     address: '',
-    type: 'Tedarikçi'
+    type: 'Tedarikçi',
+    balance: 0
   });
 
   const fetchCustomers = async () => {
@@ -60,7 +61,7 @@ const Customers = () => {
     } else {
       setShowAddModal(false);
       fetchCustomers();
-      setNewCustomer({ name: '', tax_office: '', tax_no: '', phone: '', email: '', address: '', type: 'Tedarikçi' });
+      setNewCustomer({ name: '', tax_office: '', tax_no: '', phone: '', email: '', address: '', type: 'Tedarikçi', balance: 0 });
     }
   };
 
@@ -124,7 +125,7 @@ const Customers = () => {
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>{c.email}</div>
                   </td>
                   <td><span className={`badge ${c.type === 'Müşteri' ? 'badge-success' : 'badge-primary'}`}>{c.type}</span></td>
-                  <td style={{ textAlign: 'right', fontWeight: '800' }}>₺{c.balance.toLocaleString()}</td>
+                  <td style={{ textAlign: 'right', fontWeight: '800' }}>₺{(c.balance || 0).toLocaleString()}</td>
                   <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
                     <button className="btn btn-ghost"><MoreVertical size={16} /></button>
                   </td>

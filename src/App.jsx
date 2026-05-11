@@ -34,7 +34,7 @@ import {
   Users,
   AlertCircle,
   Clock,
-  ArrowRight
+  ChevronRight
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
