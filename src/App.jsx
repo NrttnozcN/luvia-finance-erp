@@ -209,7 +209,7 @@ const App = () => {
 
   return (
     <div className="app-container">
-      <Sidebar activeModule={activeModule} setActiveModule={setActiveModule} />
+      <Sidebar activeTab={activeModule} setActiveTab={setActiveModule} />
       <main className="main-content">
         <header className="top-bar">
           <div className="search-box">
