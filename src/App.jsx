@@ -92,6 +92,7 @@ const App = () => {
       case 'vehicles': return <Vehicles />;
       case 'customers': return <Customers />;
       case 'invoices': return <Invoices />;
+      case 'invoices-create': return <Invoices initialView="create" />;
       case 'finance': return <Finance />;
       case 'revenue-expense': return <RevenueExpense />;
       case 'checks': return <Checks />;
@@ -216,6 +217,9 @@ const App = () => {
             <input type="text" placeholder="Hızlı ara (Müşteri, Fatura, Plaka...)" />
           </div>
           <div className="user-nav">
+            <button className="btn btn-primary" style={{ background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', borderRadius: '10px' }} onClick={() => setActiveModule('invoices-create')}>
+              <Plus size={18} /> Fiş İşle
+            </button>
             <button className="icon-btn" onClick={() => setActiveModule('alert-center')}>
               <Bell size={20} />
               <span className="notification-dot"></span>

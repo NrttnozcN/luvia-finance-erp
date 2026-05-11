@@ -20,8 +20,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-const Invoices = () => {
-  const [view, setView] = useState('list'); // 'list' or 'create'
+const Invoices = ({ initialView = 'list' }) => {
+  const [view, setView] = useState(initialView);
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
