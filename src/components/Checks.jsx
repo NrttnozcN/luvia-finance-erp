@@ -1,218 +1,179 @@
-import React, { useState } from 'react';
-import { toast } from 'react-hot-toast';
-import {
-  FileSpreadsheet, Plus, AlertCircle, CheckCircle2, Clock, X, CreditCard, MoreVertical,
+import React, { useState, useEffect } from 'react';
+import { 
+  CreditCard, 
+  Plus, 
+  Search, 
+  Calendar, 
+  Building2, 
+  MoreVertical, 
+  ChevronRight, 
+  ArrowUpRight, 
+  ArrowDownLeft,
+  X,
+  Clock,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
-import useStore from '../store/useStore';
-import { formatCurrency, formatDate, today } from '../utils/formatters';
-import { FormField, EmptyState } from './Invoices';
-
-const STATUS_META = {
-  portfoy:      { label: 'Portföyde',   cls: 'badge-primary',  color: 'var(--primary)' },
-  tahsil:       { label: 'Tahsil Edildi', cls: 'badge-success', color: 'var(--success)' },
-  vadesi_gecen: { label: 'Vadesi Geçti', cls: 'badge-danger',  color: 'var(--danger)' },
-  odendi:       { label: 'Ödendi',       cls: 'badge-success', color: 'var(--success)' },
-};
+import { supabase } from '../lib/supabase';
 
 const Checks = () => {
-  const checks = useStore(s => s.checks);
-  const customers = useStore(s => s.customers);
-  const addCheck = useStore(s => s.addCheck);
-  const updateCheckStatus = useStore(s => s.updateCheckStatus);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [checks, setChecks] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [newCheck, setNewCheck] = useState({
+    type: 'Müşteri Çeki',
+    due_date: new Date().toISOString().split('T')[0],
+    amount: 0,
+    bank_name: '',
+    customer_id: '',
+    status: 'Portföyde'
+  });
 
-  const today_ = today();
-
-  const counts = {
-    portfoy: checks.filter(c => c.status === 'portfoy').length,
-    vadesi_gecen: checks.filter(c => c.status === 'vadesi_gecen' || (c.status === 'portfoy' && c.dueDate < today_)).length,
-    tahsil: checks.filter(c => c.status === 'tahsil').length,
-    yaklasiyor: checks.filter(c => {
-      const in30 = new Date(Date.now() + 30 * 864e5).toISOString().split('T')[0];
-      return c.status === 'portfoy' && c.dueDate >= today_ && c.dueDate <= in30;
-    }).length,
+  const fetchData = async () => {
+    setLoading(true);
+    const { data: chks } = await supabase.from('checks').select('*, customers(name)').order('due_date', { ascending: true });
+    const { data: custs } = await supabase.from('customers').select('*');
+    setChecks(chks || []);
+    setCustomers(custs || []);
+    setLoading(false);
   };
 
-  const portfoyTotal = checks.filter(c => c.status === 'portfoy').reduce((s, c) => s + c.amount, 0);
-  const overdueTotal = checks.filter(c => c.status === 'vadesi_gecen').reduce((s, c) => s + c.amount, 0);
-  const tahsilTotal = checks.filter(c => c.status === 'tahsil' || c.status === 'odendi').reduce((s, c) => s + c.amount, 0);
-  const yaklasiTotal = checks.filter(c => {
-    const in30 = new Date(Date.now() + 30 * 864e5).toISOString().split('T')[0];
-    return c.status === 'portfoy' && c.dueDate >= today_ && c.dueDate <= in30;
-  }).reduce((s, c) => s + c.amount, 0);
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleSave = async () => {
+    const { error } = await supabase
+      .from('checks')
+      .insert([newCheck]);
+
+    if (error) alert(error.message);
+    else {
+      setShowAddModal(false);
+      fetchData();
+      setNewCheck({ type: 'Müşteri Çeki', due_date: new Date().toISOString().split('T')[0], amount: 0, bank_name: '', customer_id: '', status: 'Portföyde' });
+    }
+  };
 
   return (
-    <div>
+    <div className="checks-container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem' }}>Çek & Senet Yönetimi</h1>
-          <p className="text-muted">Portföyünüzdeki müşteri ve kendi çeklerinizin vadelerini ve durumlarını takip edin.</p>
+          <p className="text-muted">Alınan ve verilen çeklerin vade takiplerini, ciro işlemlerini ve durumlarını yönetin.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
           <Plus size={20} /> Yeni Çek/Senet Kaydı
         </button>
       </header>
 
-      <div className="grid grid-cols-4" style={{ marginBottom: '2rem' }}>
-        <CheckStatCard title="Portföydeki Çekler" value={formatCurrency(portfoyTotal)} sub={`${counts.portfoy} Adet`} icon={<FileSpreadsheet size={20} />} color="var(--primary)" />
-        <CheckStatCard title="Vadesi Geçen" value={formatCurrency(overdueTotal)} sub={`${counts.vadesi_gecen} Adet`} icon={<AlertCircle size={20} />} color="var(--danger)" />
-        <CheckStatCard title="Tahsil / Ödenen" value={formatCurrency(tahsilTotal)} sub="Tümü" icon={<CheckCircle2 size={20} />} color="var(--success)" />
-        <CheckStatCard title="Yaklaşan Vade" value={formatCurrency(yaklasiTotal)} sub={`${counts.yaklasiyor} Adet / 30 Gün`} icon={<Clock size={20} />} color="var(--warning)" />
+      {/* Stats */}
+      <div className="grid grid-cols-4" style={{ marginBottom: '2.5rem' }}>
+        <div className="card">
+          <p className="text-muted">Portföydeki Çekler</p>
+          <h2 style={{ fontSize: '1.75rem' }}>₺{checks.filter(c => c.status === 'Portföyde').reduce((acc, c) => acc + Number(c.amount), 0).toLocaleString()}</h2>
+        </div>
+        <div className="card">
+          <p className="text-muted">Vadesi Geçen</p>
+          <h2 style={{ fontSize: '1.75rem', color: 'var(--danger)' }}>₺0</h2>
+        </div>
       </div>
 
-      <div className="card">
-        {checks.length === 0 ? (
-          <EmptyState icon={<FileSpreadsheet size={48} />} title="Çek kaydı yok" description="Henüz çek veya senet eklenmemiş."
-            action={<button className="btn btn-primary" onClick={() => setShowAddModal(true)}><Plus size={18} /> Kayıt Ekle</button>} />
-        ) : (
-          <table style={{ width: '100%' }}>
-            <thead>
-              <tr>
-                <th>Vade</th>
-                <th>Cari / Keşideci</th>
-                <th>Tür</th>
-                <th>Banka / Şube</th>
-                <th style={{ textAlign: 'right' }}>Tutar</th>
-                <th style={{ textAlign: 'right' }}>Durum</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...checks].sort((a, b) => a.dueDate > b.dueDate ? 1 : -1).map(ck => {
-                const c = customers.find(c => c.id === ck.customerId);
-                const meta = STATUS_META[ck.status] || STATUS_META.portfoy;
-                const isOverdue = ck.status === 'portfoy' && ck.dueDate < today_;
-                return (
-                  <tr key={ck.id}>
-                    <td style={{ padding: '1rem', fontWeight: '700', color: isOverdue ? 'var(--danger)' : 'inherit' }}>{formatDate(ck.dueDate)}</td>
-                    <td>{c?.name || '—'}</td>
-                    <td><span className="badge" style={{ background: 'var(--bg-main)' }}>{ck.type}</span></td>
-                    <td className="text-dim">{ck.bank}{ck.branch ? ` / ${ck.branch}` : ''}</td>
-                    <td style={{ textAlign: 'right', fontWeight: '800' }}>{formatCurrency(ck.amount)}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <span className={`badge ${isOverdue ? 'badge-danger' : meta.cls}`}>
-                        {isOverdue ? 'Vadesi Geçti' : meta.label}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <select
-                        className="input"
-                        style={{ padding: '0.3rem 0.5rem', fontSize: '0.78rem', width: 'auto' }}
-                        value={ck.status}
-                        onChange={e => {
-                          updateCheckStatus(ck.id, e.target.value);
-                          toast.success('Durum güncellendi');
-                        }}
-                      >
-                        <option value="portfoy">Portföyde</option>
-                        <option value="tahsil">Tahsil Edildi</option>
-                        <option value="odendi">Ödendi</option>
-                        <option value="vadesi_gecen">Vadesi Geçti</option>
-                      </select>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+      <div className="card" style={{ padding: '0' }}>
+        <table style={{ width: '100%' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+              <th style={{ padding: '1.25rem' }}>Vade Tarihi</th>
+              <th>Tür</th>
+              <th>Cari / Keşideci</th>
+              <th>Banka</th>
+              <th style={{ textAlign: 'right' }}>Tutar</th>
+              <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>İşlem</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan="6" style={{ textAlign: 'center', padding: '3rem' }}>Yükleniyor...</td></tr>
+            ) : checks.length === 0 ? (
+              <tr><td colSpan="6" style={{ textAlign: 'center', padding: '3rem' }}>Henüz çek/senet kaydı bulunmuyor.</td></tr>
+            ) : (
+              checks.map(c => (
+                <tr key={c.id} style={{ borderBottom: '1px solid var(--bg-main)' }}>
+                  <td style={{ padding: '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <Calendar size={18} className="text-primary" />
+                      <span style={{ fontWeight: '700' }}>{new Date(c.due_date).toLocaleDateString('tr-TR')}</span>
+                    </div>
+                  </td>
+                  <td><span className={`badge ${c.type === 'Müşteri Çeki' ? 'badge-primary' : 'badge-warning'}`}>{c.type}</span></td>
+                  <td style={{ fontWeight: '600' }}>{c.customers?.name || 'Genel'}</td>
+                  <td className="text-dim">{c.bank_name}</td>
+                  <td style={{ textAlign: 'right', fontWeight: '800', color: 'var(--primary)' }}>₺{c.amount.toLocaleString()}</td>
+                  <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
+                    <button className="btn btn-ghost"><MoreVertical size={16} /></button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
+      {/* NEW CHECK MODAL */}
       {showAddModal && (
-        <NewCheckModal
-          customers={customers}
-          onClose={() => setShowAddModal(false)}
-          onSave={(data) => {
-            addCheck(data);
-            toast.success(`Çek kaydedildi: ${formatCurrency(data.amount)}`);
-            setShowAddModal(false);
-          }}
-        />
+        <div style={modalOverlayStyle}>
+          <div className="card" style={modalContentStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '8px' }}><CreditCard size={20} /></div>
+                <h2 style={{ fontSize: '1.25rem' }}>Yeni Çek/Senet Kaydı</h2>
+              </div>
+              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+            </div>
+            
+            <div className="grid grid-cols-2" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label className="label-sm">Evrak Türü</label>
+                <select className="input" value={newCheck.type} onChange={(e) => setNewCheck({...newCheck, type: e.target.value})}>
+                  <option>Müşteri Çeki</option>
+                  <option>Kendi Çekimiz</option>
+                  <option>Müşteri Senedi</option>
+                  <option>Kendi Senedimiz</option>
+                </select>
+              </div>
+              <InputGroup label="Vade Tarihi" type="date" value={newCheck.due_date} onChange={(e) => setNewCheck({...newCheck, due_date: e.target.value})} />
+              <InputGroup label="Tutar (₺)" type="number" value={newCheck.amount} onChange={(e) => setNewCheck({...newCheck, amount: e.target.value})} />
+              <InputGroup label="Banka / Şube" placeholder="Örn: Garanti BBVA" value={newCheck.bank_name} onChange={(e) => setNewCheck({...newCheck, bank_name: e.target.value})} />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              <label className="label-sm">Keşideci / Cari</label>
+              <select className="input" value={newCheck.customer_id} onChange={(e) => setNewCheck({...newCheck, customer_id: e.target.value})}>
+                <option value="">Seçiniz...</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+              <button className="btn btn-ghost" onClick={() => setShowAddModal(false)}>İptal</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Kaydı Oluştur</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 };
 
-const NewCheckModal = ({ customers, onClose, onSave }) => {
-  const [form, setForm] = useState({
-    type: 'Müşteri Çeki', customerId: '', dueDate: '', amount: '',
-    bank: '', branch: '', note: '', date: today(),
-  });
-  const [errors, setErrors] = useState({});
-
-  const validate = () => {
-    const e = {};
-    if (!form.customerId) e.customerId = 'Cari seçin';
-    if (!form.dueDate) e.dueDate = 'Vade tarihi girin';
-    if (!form.amount || parseFloat(form.amount) <= 0) e.amount = 'Tutar girin';
-    if (!form.bank) e.bank = 'Banka girin';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  return (
-    <div style={overlayStyle}>
-      <div className="card" style={{ width: '100%', maxWidth: '560px', padding: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ padding: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '8px' }}><CreditCard size={20} /></div>
-            <h2 style={{ fontSize: '1.25rem' }}>Yeni Çek / Senet Kaydı</h2>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
-        </div>
-
-        <div className="grid grid-cols-2" style={{ gap: '1.25rem' }}>
-          <FormField label="Tür">
-            <select className="input" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ width: '100%' }}>
-              <option>Müşteri Çeki</option>
-              <option>Kendi Çekimiz</option>
-              <option>Senet</option>
-            </select>
-          </FormField>
-          <FormField label="Cari *" error={errors.customerId}>
-            <select className={`input ${errors.customerId ? 'input-error' : ''}`} value={form.customerId} onChange={e => setForm(f => ({ ...f, customerId: e.target.value }))} style={{ width: '100%' }}>
-              <option value="">— Seçin —</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </FormField>
-          <FormField label="Tutar (₺) *" error={errors.amount}>
-            <input className={`input ${errors.amount ? 'input-error' : ''}`} type="number" min="0" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} style={{ width: '100%' }} />
-          </FormField>
-          <FormField label="Vade Tarihi *" error={errors.dueDate}>
-            <input className={`input ${errors.dueDate ? 'input-error' : ''}`} type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} style={{ width: '100%' }} />
-          </FormField>
-          <FormField label="Banka *" error={errors.bank}>
-            <input className={`input ${errors.bank ? 'input-error' : ''}`} value={form.bank} onChange={e => setForm(f => ({ ...f, bank: e.target.value }))} placeholder="Örn: Garanti BBVA" style={{ width: '100%' }} />
-          </FormField>
-          <FormField label="Şube">
-            <input className="input" value={form.branch} onChange={e => setForm(f => ({ ...f, branch: e.target.value }))} placeholder="Şube adı" style={{ width: '100%' }} />
-          </FormField>
-          <FormField label="Kayıt Tarihi">
-            <input className="input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={{ width: '100%' }} />
-          </FormField>
-        </div>
-
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-          <button className="btn btn-ghost" onClick={onClose}>İptal</button>
-          <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => {
-            if (!validate()) return;
-            onSave({ ...form, amount: parseFloat(form.amount) });
-          }}>Kaydı Oluştur</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const CheckStatCard = ({ title, value, sub, icon, color }) => (
-  <div className="card">
-    <div style={{ color, marginBottom: '0.75rem' }}>{icon}</div>
-    <h3 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{value}</h3>
-    <p style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-dim)' }}>{title}</p>
-    <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{sub}</p>
+const InputGroup = ({ label, placeholder, type, value, onChange }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <label className="label-sm">{label}</label>
+    <input type={type || 'text'} className="input" placeholder={placeholder} value={value} onChange={onChange} />
   </div>
 );
 
-const overlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' };
+const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' };
+const modalContentStyle = { width: '100%', maxWidth: '650px', padding: '2rem' };
 
 export default Checks;
