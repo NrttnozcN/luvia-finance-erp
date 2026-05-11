@@ -8,6 +8,9 @@ import {
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
 
+const ROLES = ['Admin', 'Muhasebe', 'Operasyon', 'Izleme'];
+
+const Settings = () => {
   const [activeTab, setActiveTab] = useState('users');
   const [loading, setLoading] = useState(false);
 
