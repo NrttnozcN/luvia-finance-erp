@@ -8,17 +8,11 @@ import {
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
 
-const ROLES = ['Admin', 'Muhasebe', 'Operasyon', 'Izleme'];
-
-const Settings = () => {
   const [activeTab, setActiveTab] = useState('users');
+  const [loading, setLoading] = useState(false);
 
-  // authStore
-  const authUsers     = useAuthStore(s => s.users);
-  const addUser       = useAuthStore(s => s.addUser);
-  const updateUser    = useAuthStore(s => s.updateUser);
-  const deleteUser    = useAuthStore(s => s.deleteUser);
-  const toggleStatus  = useAuthStore(s => s.toggleUserStatus);
+  // Veritabanından gelen kullanıcılar
+  const [profiles, setProfiles] = useState([]);
 
   // Yeni kullanıcı modal
   const [showAdd, setShowAdd]     = useState(false);
@@ -32,33 +26,72 @@ const Settings = () => {
   // Silme onayı
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  const fetchProfiles = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    if (!error && data) setProfiles(data);
+    setLoading(false);
+  };
+
+  React.useEffect(() => {
+    if (activeTab === 'users') fetchProfiles();
+  }, [activeTab]);
+
   /* ---------- Handlers ---------- */
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newUser.full_name || !newUser.username || !newUser.email || !newUser.password) {
       alert('Tüm zorunlu alanları doldurun.');
       return;
     }
-    addUser({ name: newUser.full_name, username: newUser.username, email: newUser.email, password: newUser.password, role: newUser.role, facility: 'İstanbul Merkez' });
-    supabase.from('profiles').insert([{ full_name: newUser.full_name, email: newUser.email, role: newUser.role }]);
+    const { error } = await supabase.from('profiles').insert([{ 
+      full_name: newUser.full_name, 
+      username: newUser.username, 
+      email: newUser.email, 
+      password: newUser.password, 
+      role: newUser.role 
+    }]);
+
+    if (error) {
+      alert('Kayıt başarısız: ' + error.message);
+      return;
+    }
+
     setShowAdd(false);
     setNewUser({ full_name: '', username: '', email: '', role: 'Admin', password: '' });
+    fetchProfiles();
     alert(`✅ Kullanıcı oluşturuldu!\nKullanıcı Adı: ${newUser.username}\nŞifre: ${newUser.password}`);
   };
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!editUser.name || !editUser.email) {
       alert('Ad Soyad ve E-Posta zorunludur.');
       return;
     }
-    const updates = { name: editUser.name, email: editUser.email, role: editUser.role };
+    const updates = { 
+      full_name: editUser.name, 
+      username: editUser.username,
+      email: editUser.email, 
+      role: editUser.role 
+    };
     if (editUser.password) updates.password = editUser.password;
-    updateUser(editUser.id, updates);
+    
+    await supabase.from('profiles').update(updates).eq('id', editUser.id);
+    
     setEditUser(null);
+    fetchProfiles();
   };
 
-  const handleDelete = () => {
-    deleteUser(deleteTarget.id);
+  const handleDelete = async () => {
+    await supabase.from('profiles').delete().eq('id', deleteTarget.id);
     setDeleteTarget(null);
+    fetchProfiles();
+  };
+
+  const toggleStatus = async (user) => {
+    // Profil tablosuna status eklenmediyse diye şimdilik atlıyoruz veya eklendiğini varsayarak güncelliyoruz
+    // Eğer profiles tablosunda status sütunu yoksa bunu db'den de eklemen gerekecek.
+    // Şimdilik sadece toast mesajı verelim
+    alert('Durum değiştirme yakında veritabanına bağlanacak (Şu an tabloda status sütunu yok).');
   };
 
   /* ---------- UI ---------- */
@@ -121,10 +154,11 @@ const Settings = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {authUsers.map(u => (
+                  {loading ? <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center' }}>Yükleniyor...</td></tr> : 
+                   profiles.map(u => (
                     <tr key={u.id} style={{ borderBottom: '1px solid var(--bg-main)' }}>
                       <td style={{ padding: '1rem 0' }}>
-                        <p style={{ fontWeight: '600' }}>{u.name}</p>
+                        <p style={{ fontWeight: '600' }}>{u.full_name}</p>
                         <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>@{u.username || '—'}</p>
                       </td>
                       <td className="text-muted" style={{ fontSize: '0.85rem' }}>{u.email}</td>
@@ -133,13 +167,11 @@ const Settings = () => {
                       </td>
                       <td>
                         <button
-                          onClick={() => toggleStatus(u.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: u.status === 'active' ? 'var(--success)' : 'var(--text-dim)' }}
+                          onClick={() => toggleStatus(u)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: 'var(--success)' }}
                           title="Durumu değiştir"
                         >
-                          {u.status === 'active'
-                            ? <><ToggleRight size={20} /> Aktif</>
-                            : <><ToggleLeft  size={20} /> Pasif</>}
+                          <><ToggleRight size={20} /> Aktif</>
                         </button>
                       </td>
                       <td style={{ textAlign: 'right' }}>
@@ -147,7 +179,7 @@ const Settings = () => {
                           <button
                             className="btn btn-ghost"
                             style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                            onClick={() => setEditUser({ id: u.id, name: u.name, username: u.username || '', email: u.email, role: u.role, password: '' })}
+                            onClick={() => setEditUser({ id: u.id, name: u.full_name, username: u.username || '', email: u.email, role: u.role, password: '' })}
                           >
                             <Pencil size={14} /> Düzenle
                           </button>
@@ -231,7 +263,7 @@ const Settings = () => {
             </div>
             <h2 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>Kullanıcıyı Sil</h2>
             <p className="text-muted" style={{ marginBottom: '0.5rem' }}>
-              <strong>{deleteTarget.name}</strong> adlı kullanıcıyı silmek istediğinizden emin misiniz?
+              <strong>{deleteTarget.full_name}</strong> adlı kullanıcıyı silmek istediğinizden emin misiniz?
             </p>
             <p style={{ fontSize: '0.82rem', color: 'var(--danger)', marginBottom: '2rem' }}>Bu işlem geri alınamaz.</p>
             <div style={{ display: 'flex', gap: '1rem' }}>

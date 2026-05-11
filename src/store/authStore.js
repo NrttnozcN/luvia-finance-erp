@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { genId } from '../utils/formatters';
+import { supabase } from '../lib/supabase';
 
 // ─── Rol → Modül Erişim Tablosu ──────────────────────────────────────────────
 export const ROLE_PERMISSIONS = {
@@ -48,30 +48,47 @@ export const MODULE_MATRIX = [
   { group: 'Sistem',             tabs: ['settings', 'definitions', 'alerts'] },
 ];
 
-// ─── Mock Kullanıcılar ────────────────────────────────────────────────────────
-const INITIAL_USERS = [
-  { id: 'u1', name: 'Nurettin Özcan', username: 'nurettin.ozcan', email: 'nurettin@luvia.com', password: '123456', role: 'Admin', facility: 'İstanbul Merkez', initials: 'NÖ', status: 'active', createdAt: '2024-01-01' },
-];
-
-// ─── Auth Store ───────────────────────────────────────────────────────────────
+// ─── Auth Store (Sadece Oturum Yönetimi) ──────────────────────────────────────
 const useAuthStore = create(
   persist(
     (set, get) => ({
       currentUser: null,
-      users: INITIAL_USERS,
       loginError: null,
 
-      login: (identifier, password) => {
+      login: async (identifier, password) => {
         const cleanId = identifier.trim().toLowerCase();
-        const user = get().users.find(
-          u => (u.email.toLowerCase() === cleanId || u.username?.toLowerCase() === cleanId)
-            && u.password === password && u.status === 'active'
+        
+        // Supabase'den şifresi eşleşen kullanıcıları çekelim
+        const { data: users, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('password', password);
+
+        if (error || !users || users.length === 0) {
+          set({ loginError: 'Kullanıcı adı/e-posta veya şifre hatalı.' });
+          return false;
+        }
+
+        // Çekilen kullanıcılar içinde email veya username'i eşleşen var mı bakalım
+        const user = users.find(u => 
+          (u.email && u.email.toLowerCase() === cleanId) || 
+          (u.username && u.username.toLowerCase() === cleanId)
         );
+
         if (!user) {
           set({ loginError: 'Kullanıcı adı/e-posta veya şifre hatalı.' });
           return false;
         }
-        const { password: _pw, ...safeUser } = user;
+
+        const safeUser = {
+          id: user.id,
+          name: user.full_name,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          status: 'active'
+        };
+
         set({ currentUser: safeUser, loginError: null });
         return true;
       },
@@ -88,31 +105,12 @@ const useAuthStore = create(
         const perm = ROLE_PERMISSIONS[user.role];
         if (!perm) return false;
         return perm.modules === 'all' || perm.modules.includes(tab);
-      },
-
-      addUser: (data) => set(s => {
-        const initials = data.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase();
-        const username = data.username || data.name.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '');
-        return {
-          users: [...s.users, { ...data, id: genId(), username, initials, status: 'active', createdAt: new Date().toISOString().split('T')[0] }],
-        };
-      }),
-
-      updateUser: (id, data) => set(s => ({
-        users: s.users.map(u => u.id === id ? { ...u, ...data } : u),
-      })),
-
-      toggleUserStatus: (id) => set(s => ({
-        users: s.users.map(u => u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u),
-      })),
-
-      deleteUser: (id) => set(s => ({
-        users: s.users.filter(u => u.id !== id),
-      })),
+      }
     }),
     {
       name: 'luvia_auth_storage',
-      partialize: (state) => ({ users: state.users, currentUser: state.currentUser }),
+      // Sadece currentUser'ı local storage'da tut, kullanıcı listesi artık tamamen DB'den
+      partialize: (state) => ({ currentUser: state.currentUser }),
     }
   )
 );

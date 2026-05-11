@@ -31,10 +31,14 @@ const Login = () => {
     clearError();
     if (remember) localStorage.setItem('luvia_remember_email', email);
     else localStorage.removeItem('luvia_remember_email');
+    if (!email || !password) return;
     setLoading(true);
-    await new Promise(r => setTimeout(r, 400)); // hafif efekt
-    login(email, password);
-    setLoading(false);
+    const success = await login(email, password);
+    if (success) {
+      window.location.reload();
+    } else {
+      setLoading(false);
+    }
   };
 
   const handleQuickLogin = (ql) => {
