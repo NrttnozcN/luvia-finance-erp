@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, LogIn, Lock, Mail, ShieldCheck, Zap, BarChart3 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 
+const FEATURES = [
+  { icon: '⚡', title: 'Gerçek Zamanlı Veri',     desc: 'Tüm modüller anlık senkronize çalışır' },
+  { icon: '🛡️', title: 'Rol Tabanlı Erişim',      desc: 'Admin, Muhasebe, Operasyon yetki seviyeleri' },
+  { icon: '📊', title: 'Çift Taraflı Muhasebe',   desc: 'Fatura → Defter entegrasyonu otomatik' },
+];
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
