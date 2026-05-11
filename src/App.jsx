@@ -38,7 +38,14 @@ import {
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
-import useAuthStore from './store/authStore';
+import useAuthStore, { ROLE_PERMISSIONS } from './store/authStore';
+
+const getInitials = (name) => {
+  if (!name) return '??';
+  const parts = name.trim().split(' ').filter(Boolean);
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
 
 const App = () => {
   const [activeModule, setActiveModule] = useState('dashboard');
@@ -227,10 +234,10 @@ const App = () => {
               <span className="notification-dot"></span>
             </button>
             <div className="user-profile" onClick={() => setActiveModule('settings')}>
-              <div className="avatar">NÖ</div>
+              <div className="avatar">{getInitials(currentUser?.name)}</div>
               <div className="user-info">
-                <span className="user-name">Nurettin Ö.</span>
-                <span className="user-role">Yönetici</span>
+                <span className="user-name">{currentUser?.name?.split(' ').slice(0, 2).join(' ')}</span>
+                <span className="user-role">{ROLE_PERMISSIONS[currentUser?.role]?.label || currentUser?.role}</span>
               </div>
             </div>
           </div>
