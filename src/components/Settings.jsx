@@ -42,16 +42,21 @@ const Settings = () => {
 
   /* ---------- Handlers ---------- */
   const handleAdd = async () => {
-    if (!newUser.full_name || !newUser.username || !newUser.email || !newUser.password) {
-      alert('Tüm zorunlu alanları doldurun.');
+    const fn = newUser.full_name.trim();
+    const un = newUser.username.trim();
+    const em = newUser.email.trim();
+    const pw = newUser.password.trim();
+    if (!fn || !un || !em || !pw) {
+      const missing = [!fn && 'Ad Soyad', !un && 'Kullanıcı Adı', !em && 'E-Posta', !pw && 'Şifre'].filter(Boolean).join(', ');
+      alert(`Eksik alanlar: ${missing}`);
       return;
     }
-    const { error } = await supabase.from('profiles').insert([{ 
-      full_name: newUser.full_name, 
-      username: newUser.username, 
-      email: newUser.email, 
-      password: newUser.password, 
-      role: newUser.role 
+    const { error } = await supabase.from('profiles').insert([{
+      full_name: fn,
+      username: un,
+      email: em,
+      password: pw,
+      role: newUser.role
     }]);
 
     if (error) {
@@ -59,10 +64,12 @@ const Settings = () => {
       return;
     }
 
+    const savedUsername = un;
+    const savedPassword = pw;
     setShowAdd(false);
     setNewUser({ full_name: '', username: '', email: '', role: 'Admin', password: '' });
     fetchProfiles();
-    alert(`✅ Kullanıcı oluşturuldu!\nKullanıcı Adı: ${newUser.username}\nŞifre: ${newUser.password}`);
+    alert(`✅ Kullanıcı oluşturuldu!\nKullanıcı Adı: ${savedUsername}\nŞifre: ${savedPassword}`);
   };
 
   const handleEdit = async () => {
@@ -288,10 +295,13 @@ const TabButton = ({ active, onClick, icon, label }) => (
   </button>
 );
 
-const InputGroup = ({ label, value, onChange, placeholder, defaultValue }) => (
+const InputGroup = ({ label, value, onChange, placeholder, defaultValue, autoComplete }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
     <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-dim)' }}>{label}</label>
-    <input className="input" value={value} defaultValue={defaultValue} onChange={onChange} placeholder={placeholder} />
+    {value !== undefined
+      ? <input className="input" value={value} onChange={onChange} placeholder={placeholder} autoComplete={autoComplete || 'off'} />
+      : <input className="input" defaultValue={defaultValue} onChange={onChange} placeholder={placeholder} autoComplete={autoComplete || 'off'} />
+    }
   </div>
 );
 
@@ -299,7 +309,7 @@ const PasswordField = ({ label, value, onChange, show, toggle, placeholder }) =>
   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
     <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-dim)' }}>{label}</label>
     <div style={{ position: 'relative' }}>
-      <input type={show ? 'text' : 'password'} className="input" value={value} onChange={onChange} placeholder={placeholder || 'En az 6 karakter'} style={{ paddingRight: '3rem' }} />
+      <input type={show ? 'text' : 'password'} className="input" value={value} onChange={onChange} placeholder={placeholder || 'En az 6 karakter'} autoComplete="new-password" style={{ paddingRight: '3rem' }} />
       <button type="button" onClick={toggle} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
         {show ? <EyeOff size={16} /> : <Eye size={16} />}
       </button>
