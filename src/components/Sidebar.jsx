@@ -61,6 +61,13 @@ const NAV_GROUPS = [
   },
 ];
 
+const getInitials = (name) => {
+  if (!name) return '??';
+  const parts = name.trim().split(' ').filter(Boolean);
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
 const Sidebar = ({ activeTab, setActiveTab }) => {
   const currentUser = useAuthStore(s => s.currentUser);
   const logout = useAuthStore(s => s.logout);
@@ -113,7 +120,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
           <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#1e293b', border: '2px solid #FF6B00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: '800', color: 'white', flexShrink: 0 }}>
-            {currentUser?.initials || '??'}
+            {getInitials(currentUser?.name)}
           </div>
           <div style={{ flex: 1, textAlign: 'left', overflow: 'hidden' }}>
             <p style={{ fontSize: '0.83rem', fontWeight: '700', color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser?.name}</p>
