@@ -71,7 +71,7 @@ const Stock = () => {
           <p className="text-muted">Yedek parça, akaryakıt ve diğer sarf malzemelerinizin takibini yapın.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-          <Plus size={20} /> Yeni Stok Girişi / Fişi
+          <Plus size={20} /> Yeni Stok Hareketi
         </button>
       </header>
 
@@ -146,7 +146,7 @@ const Stock = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ padding: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '8px' }}><Package size={20} /></div>
-                <h2 style={{ fontSize: '1.25rem' }}>Yeni Stok Girişi / Fişi</h2>
+                <h2 style={{ fontSize: '1.25rem' }}>Yeni Stok Hareketi (Giriş/Çıkış)</h2>
               </div>
               <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
             </div>
