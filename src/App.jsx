@@ -38,9 +38,11 @@ import {
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
+import useAuthStore from './store/authStore';
+
 const App = () => {
   const [activeModule, setActiveModule] = useState('dashboard');
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const currentUser = useAuthStore(s => s.currentUser);
   const [stats, setStats] = useState({
     totalSales: 0,
     vehicleCount: 0,
@@ -79,12 +81,12 @@ const App = () => {
   };
 
   useEffect(() => {
-    if (isLoggedIn) {
+    if (currentUser) {
       fetchDashboardStats();
     }
-  }, [isLoggedIn, activeModule]); // Modül değiştikçe verileri tazele
+  }, [currentUser, activeModule]);
 
-  if (!isLoggedIn) return <Login onLogin={() => setIsLoggedIn(true)} />;
+  if (!currentUser) return <Login />;
 
   const renderContent = () => {
     switch (activeModule) {
