@@ -49,10 +49,10 @@ export const MODULE_MATRIX = [
 
 // ─── Mock Kullanıcılar ────────────────────────────────────────────────────────
 const INITIAL_USERS = [
-  { id: 'u1', name: 'Nurettin Ö.',  email: 'admin@luvia.com',      password: '123456', role: 'Admin',     facility: 'İstanbul Merkez', initials: 'NÖ', status: 'active', createdAt: '2024-01-01' },
-  { id: 'u2', name: 'Fatma Kaya',   email: 'muhasebe@luvia.com',   password: '123456', role: 'Muhasebe',  facility: 'İstanbul Merkez', initials: 'FK', status: 'active', createdAt: '2024-03-15' },
-  { id: 'u3', name: 'Ahmet Yılmaz', email: 'operasyon@luvia.com',  password: '123456', role: 'Operasyon', facility: 'İzmir Depo',      initials: 'AY', status: 'active', createdAt: '2024-06-01' },
-  { id: 'u4', name: 'Mehmet Demir', email: 'izleme@luvia.com',     password: '123456', role: 'Izleme',    facility: 'Ankara Şube',     initials: 'MD', status: 'active', createdAt: '2025-01-10' },
+  { id: 'u1', name: 'Nurettin Ö.',  username: 'admin',     email: 'admin@luvia.com',      password: '123456', role: 'Admin',     facility: 'İstanbul Merkez', initials: 'NÖ', status: 'active', createdAt: '2024-01-01' },
+  { id: 'u2', name: 'Fatma Kaya',   username: 'fatma',     email: 'muhasebe@luvia.com',   password: '123456', role: 'Muhasebe',  facility: 'İstanbul Merkez', initials: 'FK', status: 'active', createdAt: '2024-03-15' },
+  { id: 'u3', name: 'Ahmet Yılmaz', username: 'ahmet',     email: 'operasyon@luvia.com',  password: '123456', role: 'Operasyon', facility: 'İzmir Depo',      initials: 'AY', status: 'active', createdAt: '2024-06-01' },
+  { id: 'u4', name: 'Mehmet Demir', username: 'mehmet',    email: 'izleme@luvia.com',     password: '123456', role: 'Izleme',    facility: 'Ankara Şube',     initials: 'MD', status: 'active', createdAt: '2025-01-10' },
 ];
 
 // ─── localStorage'dan oturumu geri yükle ─────────────────────────────────────
@@ -66,12 +66,14 @@ const useAuthStore = create((set, get) => ({
   users: INITIAL_USERS,
   loginError: null,
 
-  login: (email, password) => {
+  login: (identifier, password) => {
+    // identifier: e-posta VEYA kullanıcı adı
     const user = get().users.find(
-      u => u.email.toLowerCase() === email.toLowerCase() && u.password === password && u.status === 'active'
+      u => (u.email.toLowerCase() === identifier.toLowerCase() || u.username?.toLowerCase() === identifier.toLowerCase())
+        && u.password === password && u.status === 'active'
     );
     if (!user) {
-      set({ loginError: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' });
+      set({ loginError: 'Kullanıcı adı/e-posta veya şifre hatalı.' });
       return false;
     }
     const { password: _pw, ...safeUser } = user;
@@ -97,8 +99,9 @@ const useAuthStore = create((set, get) => ({
 
   addUser: (data) => set(s => {
     const initials = data.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    const username = data.username || data.name.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '');
     return {
-      users: [...s.users, { ...data, id: genId(), initials, status: 'active', createdAt: new Date().toISOString().split('T')[0] }],
+      users: [...s.users, { ...data, id: genId(), username, initials, status: 'active', createdAt: new Date().toISOString().split('T')[0] }],
     };
   }),
 

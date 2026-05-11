@@ -23,10 +23,10 @@ const Settings = () => {
   // Yeni kullanıcı modal
   const [showAdd, setShowAdd]     = useState(false);
   const [showPass, setShowPass]   = useState(false);
-  const [newUser, setNewUser]     = useState({ full_name: '', email: '', role: 'Admin', password: '' });
+  const [newUser, setNewUser]     = useState({ full_name: '', username: '', email: '', role: 'Admin', password: '' });
 
   // Düzenleme modal
-  const [editUser, setEditUser]   = useState(null); // { id, name, email, role, password }
+  const [editUser, setEditUser]   = useState(null); // { id, name, username, email, role, password }
   const [showEditPass, setShowEditPass] = useState(false);
 
   // Silme onayı
@@ -34,15 +34,15 @@ const Settings = () => {
 
   /* ---------- Handlers ---------- */
   const handleAdd = () => {
-    if (!newUser.full_name || !newUser.email || !newUser.password) {
-      alert('Ad Soyad, E-Posta ve Şifre zorunludur.');
+    if (!newUser.full_name || !newUser.username || !newUser.email || !newUser.password) {
+      alert('Tüm zorunlu alanları doldurun.');
       return;
     }
-    addUser({ name: newUser.full_name, email: newUser.email, password: newUser.password, role: newUser.role, facility: 'İstanbul Merkez' });
+    addUser({ name: newUser.full_name, username: newUser.username, email: newUser.email, password: newUser.password, role: newUser.role, facility: 'İstanbul Merkez' });
     supabase.from('profiles').insert([{ full_name: newUser.full_name, email: newUser.email, role: newUser.role }]);
     setShowAdd(false);
-    setNewUser({ full_name: '', email: '', role: 'Admin', password: '' });
-    alert(`✅ Kullanıcı oluşturuldu!\nE-Posta: ${newUser.email}\nŞifre: ${newUser.password}`);
+    setNewUser({ full_name: '', username: '', email: '', role: 'Admin', password: '' });
+    alert(`✅ Kullanıcı oluşturuldu!\nKullanıcı Adı: ${newUser.username}\nŞifre: ${newUser.password}`);
   };
 
   const handleEdit = () => {
@@ -123,7 +123,10 @@ const Settings = () => {
                 <tbody>
                   {authUsers.map(u => (
                     <tr key={u.id} style={{ borderBottom: '1px solid var(--bg-main)' }}>
-                      <td style={{ padding: '1rem 0', fontWeight: '600' }}>{u.name}</td>
+                      <td style={{ padding: '1rem 0' }}>
+                        <p style={{ fontWeight: '600' }}>{u.name}</p>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>@{u.username || '—'}</p>
+                      </td>
                       <td className="text-muted" style={{ fontSize: '0.85rem' }}>{u.email}</td>
                       <td>
                         <span className="badge badge-primary">{u.role}</span>
@@ -144,7 +147,7 @@ const Settings = () => {
                           <button
                             className="btn btn-ghost"
                             style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                            onClick={() => setEditUser({ id: u.id, name: u.name, email: u.email, role: u.role, password: '' })}
+                            onClick={() => setEditUser({ id: u.id, name: u.name, username: u.username || '', email: u.email, role: u.role, password: '' })}
                           >
                             <Pencil size={14} /> Düzenle
                           </button>
@@ -175,8 +178,9 @@ const Settings = () => {
               <button onClick={() => setShowAdd(false)} style={closeBtn}><X size={22} /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <InputGroup label="Ad Soyad *" value={newUser.full_name} onChange={e => setNewUser({ ...newUser, full_name: e.target.value })} placeholder="Örn: Ahmet Yılmaz" />
-              <InputGroup label="E-Posta *"  value={newUser.email}     onChange={e => setNewUser({ ...newUser, email: e.target.value })}     placeholder="ahmet@luvia.com" />
+              <InputGroup label="Ad Soyad *" value={newUser.full_name} onChange={e => setNewUser({ ...newUser, full_name: e.target.value })} placeholder="Örn: Kübra Özcan" />
+              <InputGroup label="Kullanıcı Adı * (giriş için)" value={newUser.username} onChange={e => setNewUser({ ...newUser, username: e.target.value.toLowerCase().replace(/\s/g,'') })} placeholder="Örn: kubra.ozcan" />
+              <InputGroup label="E-Posta *" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder="kubra@luvia.com" />
               <PasswordField label="Şifre *" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} show={showPass} toggle={() => setShowPass(s => !s)} />
               <RoleSelect value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} />
             </div>
@@ -197,8 +201,9 @@ const Settings = () => {
               <button onClick={() => setEditUser(null)} style={closeBtn}><X size={22} /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <InputGroup label="Ad Soyad *" value={editUser.name}  onChange={e => setEditUser({ ...editUser, name: e.target.value })}  placeholder="Ad Soyad" />
-              <InputGroup label="E-Posta *"  value={editUser.email} onChange={e => setEditUser({ ...editUser, email: e.target.value })} placeholder="E-Posta" />
+              <InputGroup label="Ad Soyad *" value={editUser.name}     onChange={e => setEditUser({ ...editUser, name: e.target.value })}     placeholder="Ad Soyad" />
+              <InputGroup label="Kullanıcı Adı" value={editUser.username || ''} onChange={e => setEditUser({ ...editUser, username: e.target.value.toLowerCase().replace(/\s/g,'') })} placeholder="kullanici.adi" />
+              <InputGroup label="E-Posta *"  value={editUser.email}    onChange={e => setEditUser({ ...editUser, email: e.target.value })}    placeholder="E-Posta" />
               <PasswordField
                 label="Yeni Şifre (boş bırakılırsa değişmez)"
                 value={editUser.password}

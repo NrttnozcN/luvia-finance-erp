@@ -143,14 +143,14 @@ const Login = () => {
 
             {/* E-posta */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.83rem', fontWeight: '700', color: '#374151', marginBottom: '0.45rem' }}>E-posta Adresi</label>
+              <label style={{ display: 'block', fontSize: '0.83rem', fontWeight: '700', color: '#374151', marginBottom: '0.45rem' }}>Kullanıcı Adı veya E-posta</label>
               <div style={{ position: 'relative' }}>
                 <Mail size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
                 <input
                   type="email"
                   value={email}
                   onChange={e => { setEmail(e.target.value); clearError(); }}
-                  placeholder="ornek@luvia.com"
+                  placeholder="kullanici.adi veya email@luvia.com"
                   autoComplete="email"
                   style={inputStyle(!!loginError)}
                   onFocus={e => { e.target.style.borderColor = '#FF6B00'; e.target.style.boxShadow = '0 0 0 3px rgba(255,107,0,0.1)'; }}
