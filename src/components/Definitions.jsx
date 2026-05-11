@@ -1,177 +1,197 @@
-import React, { useState } from 'react';
-import {
-  Settings, Building2, Truck, Package, Wallet,
-  ChevronRight, Plus, X, Layers, Search,
+import React, { useState, useEffect } from 'react';
+import { 
+  Settings, 
+  Plus, 
+  Search, 
+  Trash2, 
+  Edit2, 
+  ChevronRight, 
+  Tag, 
+  Layers, 
+  Package, 
+  MapPin,
+  X
 } from 'lucide-react';
-import useStore from '../store/useStore';
-import { formatCurrency } from '../utils/formatters';
-import { FormField } from './Invoices';
+import { supabase } from '../lib/supabase';
 
 const Definitions = () => {
-  const [activeSubTab, setActiveSubTab] = useState(null);
+  const [activeTab, setActiveTab] = useState('materials');
+  const [loading, setLoading] = useState(true);
+  const [materials, setMaterials] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newItem, setNewItem] = useState({ name: '', category: 'Gider', unit: 'Adet' });
 
-  const renderSubContent = () => {
-    switch (activeSubTab) {
-      case 'material_categories': return <MaterialCategoriesView onClose={() => setActiveSubTab(null)} />;
-      case 'material_cards': return <MaterialCardsView onClose={() => setActiveSubTab(null)} />;
-      default: return <DefinitionsMenu onSelect={setActiveSubTab} />;
+  const fetchMaterials = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('materials')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) console.error(error);
+    else setMaterials(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchMaterials();
+  }, []);
+
+  const handleSave = async () => {
+    const { error } = await supabase
+      .from('materials')
+      .insert([newItem]);
+
+    if (error) alert(error.message);
+    else {
+      setShowAddModal(false);
+      fetchMaterials();
+      setNewItem({ name: '', category: 'Gider', unit: 'Adet' });
+    }
+  };
+
+  const deleteMaterial = async (id) => {
+    if (window.confirm('Bu kartı silmek istediğinize emin misiniz?')) {
+      const { error } = await supabase.from('materials').delete().eq('id', id);
+      if (error) alert(error.message);
+      else fetchMaterials();
     }
   };
 
   return (
-    <div>
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '2rem' }}>Sistem Tanımlamaları</h1>
-        <p className="text-muted">Luvia ERP altyapısını, kategorileri ve genel parametreleri buradan yönetin.</p>
-      </header>
-      {renderSubContent()}
-    </div>
-  );
-};
-
-const MaterialCategoriesView = ({ onClose }) => {
-  const stockItems = useStore(s => s.stockItems);
-
-  const categories = (() => {
-    const map = {};
-    stockItems.forEach(s => {
-      map[s.category] = (map[s.category] || 0) + 1;
-    });
-    return Object.entries(map).map(([name, count]) => ({ name, count }));
-  })();
-
-  return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '0.4rem' }}><X size={20} /></button>
-          <h3 style={{ fontSize: '1.25rem' }}>Malzeme Kategorileri</h3>
+    <div className="definitions-container">
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem' }}>Sistem Tanımlamaları</h1>
+          <p className="text-muted">Gider kartları, malzeme kategorileri ve sabit tanımları yönetin.</p>
         </div>
-        <button className="btn btn-primary"><Plus size={18} /> Yeni Kategori Ekle</button>
+        <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+          <Plus size={20} /> Yeni Tanım Ekle
+        </button>
+      </header>
+
+      <div style={{ display: 'flex', gap: '2rem' }}>
+        {/* Sidebar Tabs */}
+        <div style={{ width: '280px', flexShrink: 0 }}>
+          <div className="card" style={{ padding: '0.75rem' }}>
+            <TabButton active={activeTab === 'materials'} onClick={() => setActiveTab('materials')} icon={<Tag size={18} />} label="Gider & Malzeme Kartları" />
+            <TabButton active={activeTab === 'categories'} onClick={() => setActiveTab('categories')} icon={<Layers size={18} />} label="Kategoriler" />
+            <TabButton active={activeTab === 'warehouses'} onClick={() => setActiveTab('warehouses')} icon={<MapPin size={18} />} label="Depo & Şube Tanımları" />
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div style={{ flex: 1 }}>
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.25rem' }}>{activeTab === 'materials' ? 'Malzeme Listesi' : 'Tanımlamalar'}</h2>
+              <div className="search-box" style={{ width: '300px' }}>
+                <Search size={18} className="text-dim" />
+                <input type="text" placeholder="Tanımlarda ara..." />
+              </div>
+            </div>
+
+            {loading ? (
+              <p style={{ textAlign: 'center', padding: '2rem' }}>Yükleniyor...</p>
+            ) : (
+              <table style={{ width: '100%' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ paddingBottom: '1rem' }}>Tanım Adı</th>
+                    <th style={{ paddingBottom: '1rem' }}>Kategori</th>
+                    <th style={{ paddingBottom: '1rem' }}>Birim</th>
+                    <th style={{ paddingBottom: '1rem', textAlign: 'right' }}>İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {materials.map(m => (
+                    <tr key={m.id} style={{ borderBottom: '1px solid var(--bg-main)' }}>
+                      <td style={{ padding: '1rem 0', fontWeight: '600' }}>{m.name}</td>
+                      <td><span className="badge badge-primary">{m.category}</span></td>
+                      <td className="text-dim">{m.unit}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                          <button className="btn btn-ghost" style={{ padding: '0.5rem' }}><Edit2 size={16} /></button>
+                          <button className="btn btn-ghost" style={{ padding: '0.5rem', color: 'var(--danger)' }} onClick={() => deleteMaterial(m.id)}><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
       </div>
-      {categories.length === 0 ? (
-        <p className="text-dim" style={{ textAlign: 'center', padding: '2rem 0' }}>Stok verisi yok</p>
-      ) : (
-        <div className="grid grid-cols-3" style={{ gap: '1rem' }}>
-          {categories.map(c => <CategoryCard key={c.name} name={c.name} count={`${c.count} Ürün`} />)}
+
+      {/* ADD MODAL */}
+      {showAddModal && (
+        <div style={modalOverlayStyle}>
+          <div className="card" style={modalContentStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.25rem' }}>Yeni Malzeme / Gider Tanımı</h2>
+              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-dim)' }}>Tanım Adı</label>
+                <input className="input" placeholder="Örn: Motor Yağı 10W-40" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-dim)' }}>Kategori</label>
+                <select className="input" value={newItem.category} onChange={(e) => setNewItem({...newItem, category: e.target.value})}>
+                  <option>Gider</option>
+                  <option>Yedek Parça</option>
+                  <option>Akaryakıt</option>
+                  <option>Hizmet</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-dim)' }}>Birim</label>
+                <select className="input" value={newItem.unit} onChange={(e) => setNewItem({...newItem, unit: e.target.value})}>
+                  <option>Adet</option>
+                  <option>Litre</option>
+                  <option>Kg</option>
+                  <option>Saat</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+              <button className="btn btn-ghost" onClick={() => setShowAddModal(false)} style={{ flex: 1 }}>İptal</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Kaydet</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-const MaterialCardsView = ({ onClose }) => {
-  const stockItems = useStore(s => s.stockItems);
-  const [search, setSearch] = useState('');
-
-  const visible = stockItems.filter(s =>
-    !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.category.toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '0.4rem' }}><X size={20} /></button>
-          <h3 style={{ fontSize: '1.25rem' }}>Malzeme Kartları</h3>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.45rem 0.85rem', borderRadius: '8px', alignItems: 'center' }}>
-            <Search size={14} className="text-dim" />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Ara..." style={{ background: 'transparent', border: 'none', fontSize: '0.82rem', outline: 'none', width: '120px' }} />
-          </div>
-        </div>
-      </div>
-      <table style={{ width: '100%' }}>
-        <thead>
-          <tr>
-            <th>Ürün Adı</th>
-            <th>Kategori</th>
-            <th>Birim</th>
-            <th>Tesis</th>
-            <th style={{ textAlign: 'right' }}>Stok</th>
-            <th style={{ textAlign: 'right' }}>Birim Maliyet</th>
-          </tr>
-        </thead>
-        <tbody>
-          {visible.map(s => (
-            <tr key={s.id}>
-              <td style={{ padding: '1rem', fontWeight: '700' }}>{s.name}</td>
-              <td><span className="badge" style={{ background: 'var(--bg-main)' }}>{s.category}</span></td>
-              <td className="text-dim">{s.unit}</td>
-              <td className="text-dim">{s.facility}</td>
-              <td style={{ textAlign: 'right', fontWeight: '800', color: s.qty <= 0 ? 'var(--danger)' : s.qty <= s.minQty ? 'var(--warning)' : 'inherit' }}>
-                {s.qty} {s.unit}
-              </td>
-              <td style={{ textAlign: 'right' }}>{formatCurrency(s.unitCost)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
-const DefinitionsMenu = ({ onSelect }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-    <MenuGroup title="Genel Tanımlar" icon={<Settings size={18} />}>
-      <MenuItem label="Tesis Tanımlama" />
-      <MenuItem label="Ölçü Birimleri" />
-      <MenuItem label="KDV Oranları" />
-    </MenuGroup>
-
-    <MenuGroup title="Filo & Araç" icon={<Truck size={18} />}>
-      <MenuItem label="Araç Markaları" />
-      <MenuItem label="Araç Modelleri" />
-      <MenuItem label="Araç Tipleri" />
-    </MenuGroup>
-
-    <MenuGroup title="Stok & Depo" icon={<Package size={18} />}>
-      <MenuItem label="Malzeme Kategorileri" onClick={() => onSelect('material_categories')} active />
-      <MenuItem label="Malzeme Kartları" onClick={() => onSelect('material_cards')} active />
-    </MenuGroup>
-
-    <MenuGroup title="Finansal" icon={<Wallet size={18} />}>
-      <MenuItem label="Cari Grupları" />
-      <MenuItem label="KK Tipleri" />
-      <MenuItem label="Kasa / Banka Tanımları" />
-    </MenuGroup>
-  </div>
-);
-
-const MenuGroup = ({ title, icon, children }) => (
-  <div className="card" style={{ padding: '1.5rem' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', color: 'var(--primary)' }}>
-      {icon}
-      <h3 style={{ fontSize: '1rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</h3>
-    </div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>{children}</div>
-  </div>
-);
-
-const MenuItem = ({ label, onClick, active }) => (
-  <button
+const TabButton = ({ active, onClick, icon, label }) => (
+  <button 
     onClick={onClick}
-    className="btn btn-ghost"
     style={{
-      justifyContent: 'space-between', width: '100%', padding: '0.85rem 1.25rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '1rem',
+      width: '100%',
+      padding: '1rem',
+      border: 'none',
       background: active ? 'var(--primary-light)' : 'transparent',
-      border: active ? '1px solid var(--primary)' : '1px solid transparent',
+      color: active ? 'var(--primary)' : 'var(--text-dim)',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      fontWeight: active ? '700' : '500',
+      transition: 'all 0.2s'
     }}
   >
-    <span style={{ fontWeight: active ? '700' : '500' }}>{label}</span>
-    <ChevronRight size={16} className="text-dim" />
+    {icon}
+    {label}
+    <ChevronRight size={16} style={{ marginLeft: 'auto', opacity: active ? 1 : 0 }} />
   </button>
 );
 
-const CategoryCard = ({ name, count }) => (
-  <div className="card" style={{ background: 'var(--bg-main)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-    <div style={{ padding: '0.5rem', background: 'white', borderRadius: '8px', color: 'var(--primary)' }}><Layers size={18} /></div>
-    <div>
-      <p style={{ fontWeight: '700', fontSize: '0.9rem' }}>{name}</p>
-      <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{count}</p>
-    </div>
-  </div>
-);
+const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' };
+const modalContentStyle = { width: '100%', maxWidth: '500px', padding: '2rem' };
 
 export default Definitions;
