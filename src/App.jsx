@@ -1,485 +1,290 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Toaster, toast } from 'react-hot-toast';
-import Login from './components/Login';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
-import useAuthStore from './store/authStore';
-import Invoices from './components/Invoices';
-import Stock from './components/Stock';
-import Definitions from './components/Definitions';
 import Vehicles from './components/Vehicles';
+import Customers from './components/Customers';
+import Invoices from './components/Invoices';
+import Finance from './components/Finance';
+import RevenueExpense from './components/RevenueExpense';
+import Checks from './components/Checks';
 import Fuel from './components/Fuel';
 import Tires from './components/Tires';
 import Purchasing from './components/Purchasing';
-import Finance from './components/Finance';
-import Checks from './components/Checks';
-import RevenueExpense from './components/RevenueExpense';
-import Documents from './components/Documents';
 import Personnel from './components/Personnel';
-import Ledgers from './components/Ledgers';
-import CostReports from './components/CostReports';
+import Documents from './components/Documents';
 import Settings from './components/Settings';
-import AlertCenter from './components/AlertCenter';
-import Customers from './components/Customers';
+import Stock from './components/Stock';
 import SalesReports from './components/SalesReports';
+import CostReports from './components/CostReports';
+import Definitions from './components/Definitions';
+import AlertCenter from './components/AlertCenter';
 import BulkTransfers from './components/BulkTransfers';
+import Ledgers from './components/Ledgers';
 import Facilities from './components/Facilities';
-import useStore from './store/useStore';
-import { ROLE_PERMISSIONS } from './store/authStore';
-import { formatCurrency } from './utils/formatters';
-import {
-  ArrowUpRight,
-  ArrowDownLeft,
-  PieChart,
-  Search,
-  Bell,
-  ScanLine,
-  Building2,
-  ChevronDown,
-  TrendingUp,
-  AlertCircle,
-  Package,
-  Truck,
-  Fuel as FuelIcon,
+import Login from './components/Login';
+import { 
+  Bell, 
+  Search, 
+  Plus, 
+  TrendingUp, 
+  TrendingDown, 
+  DollarSign, 
+  Truck, 
+  Fuel as FuelIcon, 
+  PieChart, 
   Users,
-  X,
-  FileText,
-  Layers,
-  User,
-  CheckCircle2,
+  AlertCircle,
+  Clock,
+  ArrowRight
 } from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import { supabase } from './lib/supabase';
 
-// ─── Global Arama ─────────────────────────────────────────────────────────────
-const GlobalSearch = ({ onNavigate, onClose }) => {
-  const [query, setQuery] = useState('');
-  const globalSearch = useStore(s => s.globalSearch);
-  const results = globalSearch(query);
-  const inputRef = useRef(null);
+const App = () => {
+  const [activeModule, setActiveModule] = useState('dashboard');
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [stats, setStats] = useState({
+    totalSales: 0,
+    vehicleCount: 0,
+    customerCount: 0,
+    fuelCost: 0,
+    pendingInvoices: 0
+  });
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  // SQL'DEN GERÇEK İSTATİSTİKLERİ ÇEK
+  const fetchDashboardStats = async () => {
+    setLoading(true);
+    
+    // 1. Toplam Satış (Faturalar)
+    const { data: invs } = await supabase.from('invoices').select('total_amount');
+    const totalSales = invs?.reduce((acc, curr) => acc + Number(curr.total_amount), 0) || 0;
 
-  const typeIcon = (type) => {
-    if (type === 'fatura') return <FileText size={16} />;
-    if (type === 'cari') return <Users size={16} />;
-    if (type === 'araç') return <Truck size={16} />;
-    if (type === 'stok') return <Layers size={16} />;
-    return <User size={16} />;
+    // 2. Araç Sayısı
+    const { count: vCount } = await supabase.from('vehicles').select('*', { count: 'exact', head: true });
+
+    // 3. Cari Sayısı
+    const { count: cCount } = await supabase.from('customers').select('*', { count: 'exact', head: true });
+
+    // 4. Akaryakıt Maliyeti
+    const { data: fuel } = await supabase.from('fuel_logs').select('total_amount');
+    const fuelCost = fuel?.reduce((acc, curr) => acc + Number(curr.total_amount), 0) || 0;
+
+    setStats({
+      totalSales,
+      vehicleCount: vCount || 0,
+      customerCount: cCount || 0,
+      fuelCost,
+      pendingInvoices: invs?.length || 0
+    });
+    setLoading(false);
   };
 
-  return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div
-        className="card"
-        style={{ width: '100%', maxWidth: '600px', padding: '1.5rem', marginTop: '5rem' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-          <Search size={20} className="text-dim" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Müşteri, Fatura no, Plaka, Malzeme..."
-            style={{ flex: 1, border: 'none', outline: 'none', fontSize: '1.1rem', background: 'transparent' }}
-          />
-          <kbd style={{ padding: '0.2rem 0.5rem', background: 'var(--bg-main)', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--text-dim)' }}>Esc</kbd>
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchDashboardStats();
+    }
+  }, [isLoggedIn, activeModule]); // Modül değiştikçe verileri tazele
+
+  if (!isLoggedIn) return <Login onLogin={() => setIsLoggedIn(true)} />;
+
+  const renderContent = () => {
+    switch (activeModule) {
+      case 'dashboard': return renderDashboard();
+      case 'vehicles': return <Vehicles />;
+      case 'customers': return <Customers />;
+      case 'invoices': return <Invoices />;
+      case 'finance': return <Finance />;
+      case 'revenue-expense': return <RevenueExpense />;
+      case 'checks': return <Checks />;
+      case 'fuel': return <Fuel />;
+      case 'tires': return <Tires />;
+      case 'purchasing': return <Purchasing />;
+      case 'personnel': return <Personnel />;
+      case 'documents': return <Documents />;
+      case 'settings': return <Settings />;
+      case 'stock': return <Stock />;
+      case 'sales-reports': return <SalesReports />;
+      case 'cost-reports': return <CostReports />;
+      case 'definitions': return <Definitions />;
+      case 'alert-center': return <AlertCenter />;
+      case 'bulk-transfers': return <BulkTransfers />;
+      case 'ledgers': return <Ledgers />;
+      case 'facilities': return <Facilities />;
+      default: return renderDashboard();
+    }
+  };
+
+  const renderDashboard = () => (
+    <div className="dashboard-view">
+      <header style={{ marginBottom: '2.5rem' }}>
+        <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Hoş Geldiniz, Nurettin</h1>
+        <p className="text-muted">İşte işletmenizin bugünkü finansal ve operasyonel özeti.</p>
+      </header>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-4" style={{ marginBottom: '2.5rem' }}>
+        <StatCard 
+          title="Toplam Ciro" 
+          value={`₺${stats.totalSales.toLocaleString()}`} 
+          trend="+12.5%" 
+          positive={true} 
+          icon={<DollarSign size={20} />} 
+        />
+        <StatCard 
+          title="Aktif Filo" 
+          value={stats.vehicleCount} 
+          trend="Tümü aktif" 
+          positive={true} 
+          icon={<Truck size={20} />} 
+        />
+        <StatCard 
+          title="Akaryakıt Gideri" 
+          value={`₺${stats.fuelCost.toLocaleString()}`} 
+          trend="-%4.2" 
+          positive={true} 
+          icon={<FuelIcon size={20} />} 
+        />
+        <StatCard 
+          title="Cari Hesaplar" 
+          value={stats.customerCount} 
+          trend="Aktif cari" 
+          positive={true} 
+          icon={<Users size={20} />} 
+        />
+      </div>
+
+      <div className="grid grid-cols-3" style={{ gap: '2rem' }}>
+        {/* Recent Alerts */}
+        <div className="col-span-2">
+          <div className="card" style={{ marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.25rem' }}>Kritik Bildirimler</h3>
+              <button className="btn btn-ghost" onClick={() => setActiveModule('alert-center')}>Tümünü Gör</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <AlertItem 
+                icon={<AlertCircle color="var(--danger)" />} 
+                title="Muayenesi Geçen Araçlar" 
+                desc="34 LUV 001 plakalı aracın muayenesi 2 gün geçti."
+                time="10 dk önce"
+              />
+              <AlertItem 
+                icon={<Clock color="var(--warning)" />} 
+                title="Vadesi Yaklaşan Çekler" 
+                desc="Gelecek 3 gün içinde 45.000 TL ödemeniz bulunuyor."
+                time="2 saat önce"
+              />
+            </div>
+          </div>
+          
+          <div className="card">
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Son İşlemler</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p className="text-dim" style={{ textAlign: 'center', padding: '2rem' }}>Henüz son işlem bulunmuyor.</p>
+            </div>
+          </div>
         </div>
 
-        {query.length >= 2 && results.length === 0 && (
-          <p className="text-dim" style={{ textAlign: 'center', padding: '1.5rem 0' }}>Sonuç bulunamadı.</p>
-        )}
-
-        {results.map(r => (
-          <button
-            key={r.id + r.type}
-            onClick={() => { onNavigate(r.tab); onClose(); }}
-            style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%', padding: '0.85rem 1rem', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '10px', textAlign: 'left' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            <div style={{ color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.4rem', borderRadius: '8px' }}>
-              {typeIcon(r.type)}
+        {/* Quick Actions */}
+        <div className="col-span-1">
+          <div className="card" style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Hızlı Operasyonlar</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <DashboardAction onClick={() => setActiveModule('vehicles')} icon={<Truck size={20} />} label="Araç Seferi Başlat" description="Plaka ve şoför ataması yap" />
+              <DashboardAction onClick={() => setActiveModule('fuel')} icon={<FuelIcon size={20} />} label="Akaryakıt Fişi Ekle" description="Fişi tara veya manuel gir" />
+              <DashboardAction onClick={() => setActiveModule('invoices')} icon={<PieChart size={20} />} label="Günlük İcmal Al" description="Tesisin gün sonu raporu" />
+              <DashboardAction onClick={() => setActiveModule('customers')} icon={<Users size={20} />} label="Cari Hareket Ekle" description="Tahsilat veya ödeme kaydı" />
             </div>
-            <div>
-              <p style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text-main)' }}>{r.label}</p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{r.sub}</p>
-            </div>
-            <span style={{ marginLeft: 'auto', fontSize: '0.7rem', padding: '0.2rem 0.6rem', background: 'var(--bg-main)', borderRadius: '6px', color: 'var(--text-dim)' }}>{r.type}</span>
-          </button>
-        ))}
+          </div>
 
-        {query.length < 2 && (
-          <p className="text-dim" style={{ fontSize: '0.85rem', textAlign: 'center', padding: '1rem 0' }}>
-            Aramak için en az 2 karakter girin...
-          </p>
-        )}
+          <div className="card" style={{ background: 'var(--primary)', color: 'white' }}>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Yardım Merkezi</h3>
+            <p style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '1.5rem' }}>Sistemle ilgili bir sorun mu yaşıyorsunuz? Destek ekibimize ulaşın.</p>
+            <button className="btn" style={{ background: 'white', color: 'var(--primary)', width: '100%' }}>Destek Talebi Oluştur</button>
+          </div>
+        </div>
       </div>
     </div>
   );
-};
-
-// ─── Ana Uygulama ─────────────────────────────────────────────────────────────
-const App = () => {
-  const currentUser = useAuthStore(s => s.currentUser);
-  const canAccess = useAuthStore(s => s.canAccess);
-
-  // Auth gate — giriş yapılmamışsa Login ekranını göster
-  if (!currentUser) return <Login />;
-
-  return <MainApp currentUser={currentUser} canAccess={canAccess} />;
-};
-
-const MainApp = ({ currentUser, canAccess }) => {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [currentFacility, setCurrentFacility] = useState('İstanbul Merkez');
-  const [showFacilityMenu, setShowFacilityMenu] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const openInvoiceModal = useStore(s => s.openInvoiceModal);
-  const setOpenInvoiceModal = useStore(s => s.setOpenInvoiceModal);
-
-  const facilities = ['İstanbul Merkez', 'İzmir Depo', 'Ankara Şube', 'Global'];
-
-  // Ctrl+K / Cmd+K global arama kısayolu
-  useEffect(() => {
-    const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowSearch(prev => !prev);
-      }
-      if (e.key === 'Escape') setShowSearch(false);
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  // Fiş İşle butonu → fatura oluştur sayfasına yönlendir
-  const handleFisIsle = () => {
-    setActiveTab('invoices');
-    setOpenInvoiceModal(true);
-  };
-
-  const renderContent = () => {
-    // dashboard her zaman erişilebilir; diğerleri için rol kontrolü
-    if (activeTab !== 'dashboard' && !canAccess(activeTab)) {
-      return <AccessDenied tab={activeTab} onBack={() => setActiveTab('dashboard')} role={currentUser.role} />;
-    }
-    switch (activeTab) {
-      case 'dashboard': return <Dashboard facility={currentFacility} navigate={setActiveTab} />;
-      case 'facilities': return <Facilities />;
-      case 'cariler': return <Customers />;
-      case 'invoices': return <Invoices />;
-      case 'wallets': return <Finance />;
-      case 'checks': return <Checks />;
-      case 'rev_exp': return <RevenueExpense />;
-      case 'logs': return <Documents />;
-      case 'ledgers': return <Ledgers />;
-      case 'stock': return <Stock />;
-      case 'vehicles': return <Vehicles />;
-      case 'fuel': return <Fuel />;
-      case 'tires': return <Tires />;
-      case 'personnel': return <Personnel />;
-      case 'costs': return <CostReports />;
-      case 'purchasing': return <Purchasing />;
-      case 'definitions': return <Definitions />;
-      case 'settings': return <Settings />;
-      case 'alerts': return <AlertCenter />;
-      case 'transfers': return <BulkTransfers />;
-      case 'sales': return <SalesReports />;
-      default: return (
-        <div className="card" style={{ textAlign: 'center', padding: '5rem' }}>
-          <h2 style={{ color: 'var(--text-dim)' }}>Bu modül yakında eklenecek...</h2>
-          <p className="text-muted">Luvia Pro geliştirilmeye devam ediyor.</p>
-        </div>
-      );
-    }
-  };
 
   return (
     <div className="app-container">
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3500,
-          style: { borderRadius: '12px', fontFamily: 'inherit', fontSize: '0.9rem' },
-          success: { style: { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d' } },
-          error: { style: { background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' } },
-        }}
-      />
-
-      {showSearch && (
-        <GlobalSearch onNavigate={setActiveTab} onClose={() => setShowSearch(false)} />
-      )}
-
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-
+      <Sidebar activeModule={activeModule} setActiveModule={setActiveModule} />
       <main className="main-content">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-          <div style={{ position: 'relative' }}>
-            <button
-              className="btn btn-ghost"
-              onClick={() => setShowFacilityMenu(!showFacilityMenu)}
-              style={{ padding: '0.6rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'white' }}
-            >
-              <Building2 size={18} color="var(--primary)" />
-              <span style={{ fontWeight: '700', fontSize: '1rem', color: 'var(--text-main)' }}>{currentFacility}</span>
-              <ChevronDown size={16} className="text-dim" />
-            </button>
-
-            {showFacilityMenu && (
-              <div className="card" style={{ position: 'absolute', top: '115%', left: 0, zIndex: 100, width: '240px', padding: '0.5rem', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)' }}>
-                {facilities.map(f => (
-                  <button
-                    key={f}
-                    onClick={() => { setCurrentFacility(f); setShowFacilityMenu(false); }}
-                    className="nav-item"
-                    style={{ width: '100%', justifyContent: 'flex-start', padding: '0.75rem', color: 'var(--text-main)', border: 'none' }}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-            )}
+        <header className="top-bar">
+          <div className="search-box">
+            <Search size={18} className="text-dim" />
+            <input type="text" placeholder="Hızlı ara (Müşteri, Fatura, Plaka...)" />
           </div>
-
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <button
-              className="search-bar"
-              onClick={() => setShowSearch(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'var(--bg-main)', padding: '0.6rem 1.25rem', borderRadius: '12px', width: '350px', border: '1px solid var(--border)', cursor: 'text' }}
-            >
-              <Search size={18} className="text-dim" />
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Hızlı ara (Ctrl+K)</span>
-              <kbd style={{ marginLeft: 'auto', padding: '0.15rem 0.5rem', background: 'white', borderRadius: '6px', fontSize: '0.7rem', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>⌘K</kbd>
+          <div className="user-nav">
+            <button className="icon-btn" onClick={() => setActiveModule('alert-center')}>
+              <Bell size={20} />
+              <span className="notification-dot"></span>
             </button>
-            <AlertBell onNavigate={setActiveTab} />
-            <button
-              className="btn btn-primary"
-              style={{ gap: '0.5rem', padding: '0.6rem 1.25rem' }}
-              onClick={handleFisIsle}
-            >
-              <ScanLine size={20} /> Fiş İşle
-            </button>
+            <div className="user-profile" onClick={() => setActiveModule('settings')}>
+              <div className="avatar">NÖ</div>
+              <div className="user-info">
+                <span className="user-name">Nurettin Ö.</span>
+                <span className="user-role">Yönetici</span>
+              </div>
+            </div>
           </div>
         </header>
-
-        {renderContent()}
+        <div className="content-area">
+          {renderContent()}
+        </div>
       </main>
     </div>
   );
 };
 
-// ─── Alert Bell ───────────────────────────────────────────────────────────────
-const AlertBell = ({ onNavigate }) => {
-  const getAlerts = useStore(s => s.getAlerts);
-  const alerts = getAlerts();
-  const dangerCount = alerts.filter(a => a.type === 'danger').length;
-
-  return (
-    <button
-      className="btn btn-ghost"
-      style={{ padding: '0.6rem', position: 'relative' }}
-      onClick={() => onNavigate('alerts')}
-    >
-      <Bell size={20} />
-      {alerts.length > 0 && (
-        <span style={{
-          position: 'absolute', top: '4px', right: '4px',
-          width: '18px', height: '18px', borderRadius: '50%',
-          background: dangerCount > 0 ? 'var(--danger)' : 'var(--warning)',
-          color: 'white', fontSize: '0.6rem', fontWeight: '800',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {alerts.length}
-        </span>
-      )}
-    </button>
-  );
-};
-
-// ─── Dashboard ────────────────────────────────────────────────────────────────
-const Dashboard = ({ facility, navigate }) => {
-  const getDashboardStats = useStore(s => s.getDashboardStats);
-  const invoices = useStore(s => s.invoices);
-  const stats = getDashboardStats();
-
-  // Son 6 ay gelir/gider verisi (faturalardan)
-  const monthlyData = (() => {
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const key = d.toISOString().slice(0, 7);
-      const label = d.toLocaleDateString('tr-TR', { month: 'short' });
-      const gelir = invoices.filter(inv => inv.type === 'Satış Faturası' && inv.date?.startsWith(key)).reduce((s, i) => s + i.total, 0);
-      const gider = invoices.filter(inv => inv.type !== 'Satış Faturası' && inv.date?.startsWith(key)).reduce((s, i) => s + i.total, 0);
-      months.push({ name: label, gelir, gider });
-    }
-    return months;
-  })();
-
-  return (
-    <>
-      <div style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '2.25rem', color: 'var(--text-main)' }}>{facility} Kontrol Paneli</h1>
-        <p className="text-muted" style={{ fontSize: '1.1rem' }}>Şirketinizin operasyonel ve finansal sağlığına dair anlık veriler.</p>
-      </div>
-
-      <div className="grid grid-cols-3" style={{ marginBottom: '2.5rem' }}>
-        <StatCard
-          title="Bu Ay Satış"
-          value={formatCurrency(stats.thisMonthSales)}
-          trend={`${stats.activeVehicles} Araç Seferde`}
-          trendUp={true}
-          icon={<TrendingUp size={24} color="var(--primary)" />}
-        />
-        <StatCard
-          title="Vadesi Geçen"
-          value={formatCurrency(stats.totalPayable)}
-          trend={`${stats.overdueCount} Fatura`}
-          trendUp={false}
-          icon={<AlertCircle size={24} color="var(--danger)" />}
-          onClick={() => navigate('invoices')}
-        />
-        <StatCard
-          title="Kritik Stok"
-          value={`${stats.criticalStockCount} Kalem`}
-          trend="Stok Alarmı"
-          trendUp={false}
-          icon={<Package size={24} color="var(--warning)" />}
-          onClick={() => navigate('stock')}
-        />
-      </div>
-
-      <div className="grid" style={{ gridTemplateColumns: '1.8fr 1.2fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2.5rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.25rem' }}>Nakit Akış Analizi</h3>
-              <p className="text-muted" style={{ fontSize: '0.85rem' }}>Son 6 aylık gelir / gider</p>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Toplam Nakit</p>
-              <p style={{ fontWeight: '800', fontSize: '1.1rem', color: stats.totalCash >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                {formatCurrency(stats.totalCash)}
-              </p>
-            </div>
-          </div>
-          <div style={{ width: '100%', height: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyData}>
-                <defs>
-                  <linearGradient id="colorGelir" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorGider" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--danger)" stopOpacity={0.10} />
-                    <stop offset="95%" stopColor="var(--danger)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="name" stroke="var(--text-dim)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--text-dim)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => `₺${(v / 1000).toFixed(0)}K`} />
-                <Tooltip
-                  formatter={(val, name) => [formatCurrency(val), name === 'gelir' ? 'Gelir' : 'Gider']}
-                  contentStyle={{ background: 'white', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: 'var(--shadow-lg)' }}
-                />
-                <Area type="monotone" dataKey="gelir" stroke="var(--primary)" fillOpacity={1} fill="url(#colorGelir)" strokeWidth={3} />
-                <Area type="monotone" dataKey="gider" stroke="var(--danger)" fillOpacity={1} fill="url(#colorGider)" strokeWidth={2} strokeDasharray="4 2" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="card">
-          <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Hızlı Özet</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <SummaryRow label="Toplam Alacak" value={formatCurrency(stats.totalReceivable)} color="var(--success)" onClick={() => navigate('cariler')} />
-            <SummaryRow label="Toplam Borç" value={formatCurrency(stats.totalPayable)} color="var(--danger)" onClick={() => navigate('invoices')} />
-            <SummaryRow label="Toplam Nakit" value={formatCurrency(stats.totalCash)} color="var(--primary)" onClick={() => navigate('wallets')} />
-            <div style={{ height: '1px', background: 'var(--border)' }} />
-            <DashboardAction icon={<Truck size={20} />} label="Araç Yönetimi" description={`${stats.activeVehicles} araç seferde`} onClick={() => navigate('vehicles')} />
-            <DashboardAction icon={<Package size={20} />} label="Stok Durumu" description={`${stats.criticalStockCount} kritik kalem`} onClick={() => navigate('stock')} />
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
-
-const SummaryRow = ({ label, value, color, onClick }) => (
-  <button
-    onClick={onClick}
-    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'var(--bg-main)', borderRadius: '10px', border: 'none', cursor: 'pointer', width: '100%' }}
-  >
-    <span style={{ fontSize: '0.9rem', color: 'var(--text-dim)', fontWeight: '600' }}>{label}</span>
-    <span style={{ fontWeight: '800', color }}>{value}</span>
-  </button>
-);
-
-const StatCard = ({ title, value, trend, trendUp, icon, onClick }) => (
-  <div
-    className="card"
-    style={{ position: 'relative', overflow: 'hidden', cursor: onClick ? 'pointer' : 'default' }}
-    onClick={onClick}
-  >
-    <div style={{ position: 'absolute', top: 0, right: 0, padding: '1.5rem' }}>{icon}</div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <span className="text-muted" style={{ fontSize: '0.95rem', fontWeight: '500' }}>{title}</span>
-      <h2 style={{ fontSize: '2rem', color: 'var(--text-main)' }}>{value}</h2>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-        <span className={`badge badge-${trendUp ? 'success' : 'danger'}`}>{trend}</span>
-        <span className="text-dim" style={{ fontSize: '0.8rem' }}>Anlık</span>
-      </div>
+const StatCard = ({ title, value, trend, positive, icon }) => (
+  <div className="card stat-card">
+    <div className="stat-header">
+      <div className="stat-icon">{icon}</div>
+      <span className={`stat-trend ${positive ? 'up' : 'down'}`}>
+        {trend}
+      </span>
+    </div>
+    <div className="stat-body">
+      <h3 className="stat-value">{value}</h3>
+      <p className="stat-label">{title}</p>
     </div>
   </div>
 );
 
-const DashboardAction = ({ icon, label, description, onClick }) => (
-  <button
-    className="btn btn-ghost"
-    onClick={onClick}
-    style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%', textAlign: 'left', padding: '0.85rem', justifyContent: 'flex-start', background: 'var(--bg-main)', border: 'none' }}
-  >
-    <div style={{ background: 'white', padding: '0.6rem', borderRadius: '10px', color: 'var(--primary)', boxShadow: 'var(--shadow-sm)' }}>{icon}</div>
-    <div>
-      <p style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text-main)' }}>{label}</p>
-      <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>{description}</p>
+const AlertItem = ({ icon, title, desc, time }) => (
+  <div className="alert-item" style={{ display: 'flex', gap: '1rem', padding: '1rem', background: 'var(--bg-main)', borderRadius: '12px' }}>
+    <div style={{ marginTop: '0.25rem' }}>{icon}</div>
+    <div style={{ flex: 1 }}>
+      <p style={{ fontWeight: '700', fontSize: '0.9rem', marginBottom: '0.25rem' }}>{title}</p>
+      <p className="text-muted" style={{ fontSize: '0.85rem' }}>{desc}</p>
     </div>
-  </button>
+    <span className="text-dim" style={{ fontSize: '0.75rem' }}>{time}</span>
+  </div>
 );
 
-// ─── Erişim Engellendi ────────────────────────────────────────────────────────
-const AccessDenied = ({ onBack, role }) => {
-  const roleMeta = ROLE_PERMISSIONS[role];
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', gap: '1rem' }}>
-      <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.5rem' }}>
-        <span style={{ fontSize: '2rem' }}>🔒</span>
-      </div>
-      <h2 style={{ fontSize: '1.5rem', color: 'var(--text-main)' }}>Bu Modüle Erişim Yok</h2>
-      <p style={{ color: 'var(--text-muted)', maxWidth: '380px', lineHeight: '1.6' }}>
-        <strong style={{ color: roleMeta?.color }}>{roleMeta?.label}</strong> rolünün bu modüle erişim yetkisi bulunmuyor.
-        Yöneticinizden yetki talep edebilirsiniz.
-      </p>
-      <button className="btn btn-primary" onClick={onBack} style={{ marginTop: '0.5rem' }}>Dashboard'a Dön</button>
+const DashboardAction = ({ icon, label, description, onClick }) => (
+  <div 
+    className="dashboard-action" 
+    onClick={onClick}
+    style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: '1rem', 
+      padding: '1rem', 
+      borderRadius: '12px', 
+      border: '1px solid var(--border)',
+      cursor: 'pointer',
+      transition: 'all 0.2s'
+    }}
+  >
+    <div style={{ color: 'var(--primary)' }}>{icon}</div>
+    <div style={{ flex: 1 }}>
+      <p style={{ fontWeight: '700', fontSize: '0.9rem' }}>{label}</p>
+      <p className="text-muted" style={{ fontSize: '0.8rem' }}>{description}</p>
     </div>
-  );
-};
-
-const overlayStyle = {
-  position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-  background: 'rgba(0,0,0,0.5)', zIndex: 2000,
-  display: 'flex', justifyContent: 'center', backdropFilter: 'blur(4px)',
-  padding: '0 1rem',
-};
+    <ChevronRight size={16} className="text-dim" />
+  </div>
+);
 
 export default App;
