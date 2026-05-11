@@ -12,17 +12,21 @@ import {
   Save,
   Plus,
   X,
-  Mail,
-  Smartphone
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState([]);
   const [showUserModal, setShowUserModal] = useState(false);
-  const [newUser, setNewUser] = useState({ full_name: '', email: '', role: 'Kullanıcı' });
+  const [newUser, setNewUser] = useState({ full_name: '', email: '', role: 'Admin', password: '' });
+  const [showPass, setShowPass] = useState(false);
+  const addUser = useAuthStore(s => s.addUser);
+  const authUsers = useAuthStore(s => s.users);
 
   const fetchProfiles = async () => {
     setLoading(true);
@@ -37,13 +41,24 @@ const Settings = () => {
   }, []);
 
   const handleSaveUser = async () => {
-    const { error } = await supabase.from('profiles').insert([newUser]);
-    if (error) alert(error.message);
-    else {
-      setShowUserModal(false);
-      fetchProfiles();
-      setNewUser({ full_name: '', email: '', role: 'Kullanıcı' });
+    if (!newUser.full_name || !newUser.email || !newUser.password) {
+      alert('Ad Soyad, E-Posta ve Şifre alanları zorunludur.');
+      return;
     }
+    // authStore'a ekle (giriş yapabilsin diye)
+    addUser({
+      name: newUser.full_name,
+      email: newUser.email,
+      password: newUser.password,
+      role: newUser.role,
+      facility: 'İstanbul Merkez',
+    });
+    // Supabase profiles tablosuna da kaydet
+    await supabase.from('profiles').insert([{ full_name: newUser.full_name, email: newUser.email, role: newUser.role }]);
+    setShowUserModal(false);
+    fetchProfiles();
+    setNewUser({ full_name: '', email: '', role: 'Admin', password: '' });
+    alert(`Kullanıcı oluşturuldu!\nE-Posta: ${newUser.email}\nŞifre: ${newUser.password}`);
   };
 
   return (
@@ -95,31 +110,20 @@ const Settings = () => {
                 <thead>
                   <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
                     <th style={{ paddingBottom: '1rem' }}>Ad Soyad</th>
+                    <th style={{ paddingBottom: '1rem' }}>E-Posta</th>
                     <th style={{ paddingBottom: '1rem' }}>Rol</th>
                     <th style={{ paddingBottom: '1rem' }}>Durum</th>
-                    <th style={{ paddingBottom: '1rem', textAlign: 'right' }}>İşlem</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
-                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>Yükleniyor...</td></tr>
-                  ) : profiles.length === 0 ? (
-                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>Henüz kullanıcı kaydı yok.</td></tr>
-                  ) : (
-                    profiles.map(p => (
-                      <tr key={p.id} style={{ borderBottom: '1px solid var(--bg-main)' }}>
-                        <td style={{ padding: '1rem 0' }}>
-                          <p style={{ fontWeight: '600' }}>{p.full_name}</p>
-                          <p className="text-muted" style={{ fontSize: '0.8rem' }}>{p.email}</p>
-                        </td>
-                        <td><span className="badge badge-primary">{p.role}</span></td>
-                        <td><span className="badge badge-success">Aktif</span></td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button className="btn btn-ghost" style={{ padding: '0.5rem' }}><SettingsIcon size={16} /></button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  {authUsers.map(u => (
+                    <tr key={u.id} style={{ borderBottom: '1px solid var(--bg-main)' }}>
+                      <td style={{ padding: '1rem 0', fontWeight: '600' }}>{u.name}</td>
+                      <td className="text-muted" style={{ fontSize: '0.85rem' }}>{u.email}</td>
+                      <td><span className="badge badge-primary">{u.role}</span></td>
+                      <td><span className={`badge ${u.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{u.status === 'active' ? 'Aktif' : 'Pasif'}</span></td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -135,21 +139,38 @@ const Settings = () => {
               <h2 style={{ fontSize: '1.25rem' }}>Yeni Kullanıcı Ekle</h2>
               <button onClick={() => setShowUserModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <InputGroup label="Ad Soyad" value={newUser.full_name} onChange={(e) => setNewUser({...newUser, full_name: e.target.value})} />
-              <InputGroup label="E-Posta" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <InputGroup label="Ad Soyad *" value={newUser.full_name} onChange={(e) => setNewUser({...newUser, full_name: e.target.value})} placeholder="Örn: Ahmet Yılmaz" />
+              <InputGroup label="E-Posta *" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} placeholder="ahmet@luvia.com" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label className="label-sm">Şifre *</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    className="input"
+                    placeholder="En az 6 karakter"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                    style={{ paddingRight: '3rem' }}
+                  />
+                  <button type="button" onClick={() => setShowPass(s => !s)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label className="label-sm">Sistem Rolü</label>
                 <select className="input" value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})}>
-                  <option>Kullanıcı</option>
-                  <option>Yönetici</option>
-                  <option>Sadece Görüntüleme</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Muhasebe">Muhasebe</option>
+                  <option value="Operasyon">Operasyon</option>
+                  <option value="Izleme">Sadece İzleme</option>
                 </select>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
               <button className="btn btn-ghost" onClick={() => setShowUserModal(false)} style={{ flex: 1 }}>İptal</button>
-              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSaveUser}>Ekle</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSaveUser}><Lock size={16} /> Kullanıcı Oluştur</button>
             </div>
           </div>
         </div>
@@ -182,10 +203,10 @@ const TabButton = ({ active, onClick, icon, label }) => (
   </button>
 );
 
-const InputGroup = ({ label, value, onChange }) => (
+const InputGroup = ({ label, value, onChange, placeholder }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
     <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-dim)' }}>{label}</label>
-    <input className="input" value={value} onChange={onChange} />
+    <input className="input" value={value} onChange={onChange} placeholder={placeholder} />
   </div>
 );
 
