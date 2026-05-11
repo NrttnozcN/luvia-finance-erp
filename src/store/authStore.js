@@ -62,8 +62,9 @@ const useAuthStore = create(
       loginError: null,
 
       login: (identifier, password) => {
+        const cleanId = identifier.trim().toLowerCase();
         const user = get().users.find(
-          u => (u.email.toLowerCase() === identifier.toLowerCase() || u.username?.toLowerCase() === identifier.toLowerCase())
+          u => (u.email.toLowerCase() === cleanId || u.username?.toLowerCase() === cleanId)
             && u.password === password && u.status === 'active'
         );
         if (!user) {
