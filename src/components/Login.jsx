@@ -2,18 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, LogIn, Lock, Mail, ShieldCheck, Zap, BarChart3 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 
-const FEATURES = [
-  { icon: <Zap size={18} />, title: 'Gerçek Zamanlı Veri', desc: 'Tüm modüller anlık senkronize çalışır' },
-  { icon: <ShieldCheck size={18} />, title: 'Rol Tabanlı Erişim', desc: 'Admin, Muhasebe, Operasyon yetki seviyeleri' },
-  { icon: <BarChart3 size={18} />, title: 'Çift Taraflı Muhasebe', desc: 'Fatura → Defter entegrasyonu otomatik' },
-];
-
-const QUICK_LOGINS = [
-  { role: 'Admin',     label: '🔑 Admin',      email: 'admin@luvia.com',     color: '#FF6B00' },
-  { role: 'Muhasebe',  label: '💼 Muhasebe',   email: 'muhasebe@luvia.com',  color: '#22C55E' },
-  { role: 'Operasyon', label: '🚛 Operasyon',  email: 'operasyon@luvia.com', color: '#F59E0B' },
-];
-
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -146,12 +134,12 @@ const Login = () => {
               <label style={{ display: 'block', fontSize: '0.83rem', fontWeight: '700', color: '#374151', marginBottom: '0.45rem' }}>Kullanıcı Adı veya E-posta</label>
               <div style={{ position: 'relative' }}>
                 <Mail size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
-                <input
-                  type="email"
+                 <input
+                  type="text"
                   value={email}
                   onChange={e => { setEmail(e.target.value); clearError(); }}
                   placeholder="kullanici.adi veya email@luvia.com"
-                  autoComplete="email"
+                  autoComplete="username"
                   style={inputStyle(!!loginError)}
                   onFocus={e => { e.target.style.borderColor = '#FF6B00'; e.target.style.boxShadow = '0 0 0 3px rgba(255,107,0,0.1)'; }}
                   onBlur={e => { e.target.style.borderColor = loginError ? '#ef4444' : '#e2e8f0'; e.target.style.boxShadow = 'none'; }}
@@ -223,36 +211,6 @@ const Login = () => {
               )}
             </button>
           </form>
-
-          {/* Demo Hesapları */}
-          <div style={{ marginTop: '1.75rem', padding: '1.2rem', background: 'rgba(255,107,0,0.05)', border: '1px dashed rgba(255,107,0,0.22)', borderRadius: '14px' }}>
-            <p style={{ fontSize: '0.72rem', fontWeight: '800', color: '#94a3b8', marginBottom: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-              Demo Hesapları — Şifre: <span style={{ color: '#FF6B00' }}>123456</span>
-            </p>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {QUICK_LOGINS.map(ql => (
-                <button
-                  key={ql.role}
-                  onClick={() => handleQuickLogin(ql)}
-                  style={{
-                    padding: '0.38rem 0.8rem',
-                    border: `1.5px solid ${ql.color}33`,
-                    background: `${ql.color}0f`,
-                    borderRadius: '8px',
-                    color: ql.color,
-                    fontWeight: '700',
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = `${ql.color}22`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = `${ql.color}0f`; e.currentTarget.style.transform = 'none'; }}
-                >
-                  {ql.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <div style={{ marginTop: '1.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#cbd5e1', fontSize: '0.75rem', justifyContent: 'center' }}>
             <ShieldCheck size={13} />

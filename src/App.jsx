@@ -119,7 +119,7 @@ const App = () => {
   const renderDashboard = () => (
     <div className="dashboard-view">
       <header style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Hoş Geldiniz, Nurettin</h1>
+        <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Hoş Geldiniz, {currentUser?.name || 'Nurettin Özcan'}</h1>
         <p className="text-muted">İşte işletmenizin bugünkü finansal ve operasyonel özeti.</p>
       </header>
 

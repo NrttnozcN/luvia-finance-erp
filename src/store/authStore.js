@@ -49,11 +49,9 @@ export const MODULE_MATRIX = [
 
 // ─── Mock Kullanıcılar ────────────────────────────────────────────────────────
 const INITIAL_USERS = [
-  { id: 'u1', name: 'Nurettin Ö.',  username: 'admin',     email: 'admin@luvia.com',      password: '123456', role: 'Admin',     facility: 'İstanbul Merkez', initials: 'NÖ', status: 'active', createdAt: '2024-01-01' },
-  { id: 'u2', name: 'Fatma Kaya',   username: 'fatma',     email: 'muhasebe@luvia.com',   password: '123456', role: 'Muhasebe',  facility: 'İstanbul Merkez', initials: 'FK', status: 'active', createdAt: '2024-03-15' },
-  { id: 'u3', name: 'Ahmet Yılmaz', username: 'ahmet',     email: 'operasyon@luvia.com',  password: '123456', role: 'Operasyon', facility: 'İzmir Depo',      initials: 'AY', status: 'active', createdAt: '2024-06-01' },
-  { id: 'u4', name: 'Mehmet Demir', username: 'mehmet',    email: 'izleme@luvia.com',     password: '123456', role: 'Izleme',    facility: 'Ankara Şube',     initials: 'MD', status: 'active', createdAt: '2025-01-10' },
+  { id: 'u1', name: 'Nurettin Özcan', username: 'nurettin.ozcan', email: 'nurettin@luvia.com', password: '123456', role: 'Admin', facility: 'İstanbul Merkez', initials: 'NÖ', status: 'active', createdAt: '2024-01-01' },
 ];
+
 
 // ─── localStorage'dan oturumu geri yükle ─────────────────────────────────────
 const restoreSession = () => {
