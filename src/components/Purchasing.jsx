@@ -20,6 +20,8 @@ const Purchasing = () => {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState([]);
   const [materials, setMaterials] = useState([]);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [editRecord, setEditRecord] = useState(null);
   const [newRequest, setNewRequest] = useState({
     material_id: '',
     quantity: 1,
@@ -51,6 +53,21 @@ const Purchasing = () => {
       fetchData();
       setNewRequest({ material_id: '', quantity: 1, priority: 'Normal', description: '' });
     }
+  };
+
+  const handleUpdate = async () => {
+    const { id, materials: _m, ...fields } = editRecord;
+    const { error } = await supabase.from('purchase_requests').update(fields).eq('id', id);
+    if (error) { alert('Güncelleme hatası: ' + error.message); return; }
+    setEditRecord(null);
+    fetchData();
+  };
+
+  const handleDelete = async (id, record) => {
+    if (!window.confirm(`"${record.description || id}" silinecek. Emin misin?`)) return;
+    const { error } = await supabase.from('purchase_requests').delete().eq('id', id);
+    if (error) { alert('Silme hatası: ' + error.message); return; }
+    fetchData();
   };
 
   return (
@@ -116,8 +133,27 @@ const Purchasing = () => {
                     </span>
                   </td>
                   <td><span className="badge badge-warning">{r.status}</span></td>
-                  <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
-                    <button className="btn btn-ghost"><MoreVertical size={16} /></button>
+                  <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
+                    <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === r.id ? null : r.id); }}>
+                      <MoreVertical size={16} />
+                    </button>
+                    {openMenuId === r.id && (
+                      <div style={{ position: 'absolute', right: '1rem', top: '100%', background: 'white', border: '1px solid var(--border)', borderRadius: '10px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)', zIndex: 100, minWidth: '140px', overflow: 'hidden' }}
+                        onMouseLeave={() => setOpenMenuId(null)}>
+                        <button onClick={() => { setEditRecord({ ...r }); setOpenMenuId(null); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          ✏️ Düzenle
+                        </button>
+                        <button onClick={() => { setOpenMenuId(null); handleDelete(r.id, r); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--danger)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.07)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          🗑️ Sil
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -125,6 +161,44 @@ const Purchasing = () => {
           </tbody>
         </table>
       </div>
+
+      {/* EDIT REQUEST MODAL */}
+      {editRecord && (
+        <div style={modalOverlayStyle}>
+          <div className="card" style={modalContentStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '8px' }}><ShoppingCart size={20} /></div>
+                <h2 style={{ fontSize: '1.25rem' }}>Satın Alma Talebini Düzenle</h2>
+              </div>
+              <button onClick={() => setEditRecord(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+            </div>
+            <div className="grid grid-cols-2" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label className="label-sm">Malzeme / Ürün</label>
+                <select className="input" value={editRecord.material_id || ''} onChange={(e) => setEditRecord({...editRecord, material_id: e.target.value})}>
+                  <option value="">Seçiniz...</option>
+                  {materials.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              <InputGroup label="Miktar" type="number" value={editRecord.quantity} onChange={(e) => setEditRecord({...editRecord, quantity: e.target.value})} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label className="label-sm">Öncelik</label>
+                <select className="input" value={editRecord.priority || 'Normal'} onChange={(e) => setEditRecord({...editRecord, priority: e.target.value})}>
+                  <option>Normal</option>
+                  <option>Düşük</option>
+                  <option>Acil</option>
+                </select>
+              </div>
+            </div>
+            <InputGroup label="Talep Nedeni / Açıklama" placeholder="Lütfen detay girin..." value={editRecord.description || ''} onChange={(e) => setEditRecord({...editRecord, description: e.target.value})} />
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+              <button className="btn btn-ghost" onClick={() => setEditRecord(null)}>İptal</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleUpdate}>Güncelle</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* NEW REQUEST MODAL */}
       {showAddModal && (

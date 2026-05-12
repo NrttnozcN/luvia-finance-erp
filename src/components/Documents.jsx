@@ -20,6 +20,8 @@ const Documents = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [docs, setDocs] = useState([]);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [editRecord, setEditRecord] = useState(null);
   const [newDoc, setNewDoc] = useState({ name: '', category: 'Araç' });
 
   const fetchDocs = async () => {
@@ -42,6 +44,21 @@ const Documents = () => {
       fetchDocs();
       setNewDoc({ name: '', category: 'Araç' });
     }
+  };
+
+  const handleUpdate = async () => {
+    const { id, ...fields } = editRecord;
+    const { error } = await supabase.from('documents').update(fields).eq('id', id);
+    if (error) { alert('Güncelleme hatası: ' + error.message); return; }
+    setEditRecord(null);
+    fetchDocs();
+  };
+
+  const handleDelete = async (id, record) => {
+    if (!window.confirm(`"${record.name || id}" silinecek. Emin misin?`)) return;
+    const { error } = await supabase.from('documents').delete().eq('id', id);
+    if (error) { alert('Silme hatası: ' + error.message); return; }
+    fetchDocs();
   };
 
   return (
@@ -94,11 +111,27 @@ const Documents = () => {
                   </td>
                   <td><span className="badge badge-primary">{doc.category}</span></td>
                   <td className="text-dim" style={{ fontSize: '0.9rem' }}>{new Date(doc.created_at).toLocaleDateString('tr-TR')}</td>
-                  <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                      <button className="btn btn-ghost" style={{ color: 'var(--danger)' }}><Trash2 size={16} /></button>
-                      <button className="btn btn-ghost"><MoreVertical size={16} /></button>
-                    </div>
+                  <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
+                    <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === doc.id ? null : doc.id); }}>
+                      <MoreVertical size={16} />
+                    </button>
+                    {openMenuId === doc.id && (
+                      <div style={{ position: 'absolute', right: '1rem', top: '100%', background: 'white', border: '1px solid var(--border)', borderRadius: '10px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)', zIndex: 100, minWidth: '140px', overflow: 'hidden' }}
+                        onMouseLeave={() => setOpenMenuId(null)}>
+                        <button onClick={() => { setEditRecord({ ...doc }); setOpenMenuId(null); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          ✏️ Düzenle
+                        </button>
+                        <button onClick={() => { setOpenMenuId(null); handleDelete(doc.id, doc); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--danger)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.07)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          🗑️ Sil
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -106,6 +139,40 @@ const Documents = () => {
           </tbody>
         </table>
       </div>
+
+      {/* EDIT DOC MODAL */}
+      {editRecord && (
+        <div style={modalOverlayStyle}>
+          <div className="card" style={modalContentStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '8px' }}><FileText size={20} /></div>
+                <h2 style={{ fontSize: '1.25rem' }}>Dökümanı Düzenle</h2>
+              </div>
+              <button onClick={() => setEditRecord(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label className="label-sm">Döküman Adı</label>
+                <input className="input" placeholder="Örn: 34 LUV 001 Muayene Belgesi" value={editRecord.name || ''} onChange={(e) => setEditRecord({...editRecord, name: e.target.value})} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label className="label-sm">Döküman Kategorisi</label>
+                <select className="input" value={editRecord.category || 'Araç'} onChange={(e) => setEditRecord({...editRecord, category: e.target.value})}>
+                  <option>Araç</option>
+                  <option>Personel</option>
+                  <option>Sözleşme</option>
+                  <option>Muhasebe</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button className="btn btn-ghost" onClick={() => setEditRecord(null)} style={{ flex: 1 }}>İptal</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleUpdate}>Güncelle</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* NEW DOC MODAL */}
       {showAddModal && (

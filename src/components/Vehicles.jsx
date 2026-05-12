@@ -20,6 +20,8 @@ const Vehicles = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState([]);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [editRecord, setEditRecord] = useState(null);
   const [newVehicle, setNewVehicle] = useState({
     plate: '',
     model: '',
@@ -49,6 +51,21 @@ const Vehicles = () => {
   useEffect(() => {
     fetchVehicles();
   }, []);
+
+  const handleUpdate = async () => {
+    const { id, ...fields } = editRecord;
+    const { error } = await supabase.from('vehicles').update(fields).eq('id', id);
+    if (error) { alert('Güncelleme hatası: ' + error.message); return; }
+    setEditRecord(null);
+    fetchVehicles();
+  };
+
+  const handleDelete = async (id, record) => {
+    if (!window.confirm(`"${record.plate || id}" silinecek. Emin misin?`)) return;
+    const { error } = await supabase.from('vehicles').delete().eq('id', id);
+    if (error) { alert('Silme hatası: ' + error.message); return; }
+    fetchVehicles();
+  };
 
   // YENİ ARAÇ KAYDET
   const handleSave = async () => {
@@ -118,8 +135,27 @@ const Vehicles = () => {
                   <td className="text-dim" style={{ fontSize: '0.9rem' }}>{v.driver_name || 'Atanmamış'}</td>
                   <td style={{ fontWeight: '700' }}>{v.current_km.toLocaleString()} km</td>
                   <td><span className="badge badge-success">{v.status}</span></td>
-                  <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
-                    <button className="btn btn-ghost"><MoreVertical size={16} /></button>
+                  <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
+                    <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === v.id ? null : v.id); }}>
+                      <MoreVertical size={16} />
+                    </button>
+                    {openMenuId === v.id && (
+                      <div style={{ position: 'absolute', right: '1rem', top: '100%', background: 'white', border: '1px solid var(--border)', borderRadius: '10px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)', zIndex: 100, minWidth: '140px', overflow: 'hidden' }}
+                        onMouseLeave={() => setOpenMenuId(null)}>
+                        <button onClick={() => { setEditRecord({ ...v }); setOpenMenuId(null); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          ✏️ Düzenle
+                        </button>
+                        <button onClick={() => { setOpenMenuId(null); handleDelete(v.id, v); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--danger)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.07)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          🗑️ Sil
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -127,6 +163,43 @@ const Vehicles = () => {
           </tbody>
         </table>
       </div>
+
+      {/* EDIT VEHICLE MODAL */}
+      {editRecord && (
+        <div style={modalOverlayStyle}>
+          <div className="card" style={modalContentStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '8px' }}><Truck size={20} /></div>
+                <h2 style={{ fontSize: '1.25rem' }}>Aracı Düzenle</h2>
+              </div>
+              <button onClick={() => setEditRecord(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+            </div>
+            <div className="grid grid-cols-2" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <InputGroup label="Plaka" placeholder="34 LUV ..." value={editRecord.plate || ''} onChange={(e) => setEditRecord({...editRecord, plate: e.target.value.toUpperCase()})} />
+              <InputGroup label="Marka / Model" placeholder="Örn: Mercedes Actros" value={editRecord.model || ''} onChange={(e) => setEditRecord({...editRecord, model: e.target.value})} />
+              <InputGroup label="Model Yılı" placeholder="2023" value={editRecord.model_year || ''} onChange={(e) => setEditRecord({...editRecord, model_year: e.target.value})} />
+              <InputGroup label="Şasi No" placeholder="VIN..." value={editRecord.vin_no || ''} onChange={(e) => setEditRecord({...editRecord, vin_no: e.target.value})} />
+            </div>
+            <div className="grid grid-cols-2" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <InputGroup label="Şoför Seçin" placeholder="Ad Soyad" value={editRecord.driver_name || ''} onChange={(e) => setEditRecord({...editRecord, driver_name: e.target.value})} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-dim)' }}>Araç Tipi</label>
+                <select className="input" value={editRecord.vehicle_type || 'Çekici'} onChange={(e) => setEditRecord({...editRecord, vehicle_type: e.target.value})}>
+                  <option>Çekici</option>
+                  <option>Dorse</option>
+                  <option>Kamyonet</option>
+                  <option>Binek</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button className="btn btn-ghost" onClick={() => setEditRecord(null)}>İptal</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleUpdate}>Güncelle</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* NEW VEHICLE MODAL */}
       {showAddModal && (

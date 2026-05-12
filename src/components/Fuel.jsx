@@ -20,6 +20,8 @@ const Fuel = () => {
   const [loading, setLoading] = useState(true);
   const [fuelLogs, setFuelLogs] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [editRecord, setEditRecord] = useState(null);
   const [newLog, setNewLog] = useState({
     vehicle_id: '',
     litres: 0,
@@ -52,6 +54,21 @@ const Fuel = () => {
       fetchData();
       setNewLog({ vehicle_id: '', litres: 0, total_amount: 0, km_reading: 0, station_name: 'Opet' });
     }
+  };
+
+  const handleUpdate = async () => {
+    const { id, vehicles: _v, ...fields } = editRecord;
+    const { error } = await supabase.from('fuel_logs').update(fields).eq('id', id);
+    if (error) { alert('Güncelleme hatası: ' + error.message); return; }
+    setEditRecord(null);
+    fetchData();
+  };
+
+  const handleDelete = async (id, record) => {
+    if (!window.confirm(`"${record.station_name || id}" silinecek. Emin misin?`)) return;
+    const { error } = await supabase.from('fuel_logs').delete().eq('id', id);
+    if (error) { alert('Silme hatası: ' + error.message); return; }
+    fetchData();
   };
 
   return (
@@ -106,8 +123,27 @@ const Fuel = () => {
                   <td style={{ fontWeight: '800', color: 'var(--primary)' }}>₺{l.total_amount.toLocaleString()}</td>
                   <td className="text-dim">{l.km_reading?.toLocaleString()} km</td>
                   <td style={{ fontSize: '0.9rem' }}>{l.station_name}</td>
-                  <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
-                    <button className="btn btn-ghost"><MoreVertical size={16} /></button>
+                  <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
+                    <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === l.id ? null : l.id); }}>
+                      <MoreVertical size={16} />
+                    </button>
+                    {openMenuId === l.id && (
+                      <div style={{ position: 'absolute', right: '1rem', top: '100%', background: 'white', border: '1px solid var(--border)', borderRadius: '10px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)', zIndex: 100, minWidth: '140px', overflow: 'hidden' }}
+                        onMouseLeave={() => setOpenMenuId(null)}>
+                        <button onClick={() => { setEditRecord({ ...l }); setOpenMenuId(null); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          ✏️ Düzenle
+                        </button>
+                        <button onClick={() => { setOpenMenuId(null); handleDelete(l.id, l); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--danger)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.07)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          🗑️ Sil
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -115,6 +151,38 @@ const Fuel = () => {
           </tbody>
         </table>
       </div>
+
+      {/* EDIT FUEL MODAL */}
+      {editRecord && (
+        <div style={modalOverlayStyle}>
+          <div className="card" style={modalContentStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '8px' }}><FuelIcon size={20} /></div>
+                <h2 style={{ fontSize: '1.25rem' }}>Yakıt Fişini Düzenle</h2>
+              </div>
+              <button onClick={() => setEditRecord(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+            </div>
+            <div className="grid grid-cols-2" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label className="label-sm">Araç Seçin</label>
+                <select className="input" value={editRecord.vehicle_id || ''} onChange={(e) => setEditRecord({...editRecord, vehicle_id: e.target.value})}>
+                  <option value="">Plaka Seçiniz...</option>
+                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.plate}</option>)}
+                </select>
+              </div>
+              <InputGroup label="İstasyon" placeholder="Opet, Shell vb." value={editRecord.station_name || ''} onChange={(e) => setEditRecord({...editRecord, station_name: e.target.value})} />
+              <InputGroup label="Miktar (Litre)" type="number" value={editRecord.litres} onChange={(e) => setEditRecord({...editRecord, litres: e.target.value})} />
+              <InputGroup label="Toplam Tutar (₺)" type="number" value={editRecord.total_amount} onChange={(e) => setEditRecord({...editRecord, total_amount: e.target.value})} />
+              <InputGroup label="Km Okuma" type="number" value={editRecord.km_reading} onChange={(e) => setEditRecord({...editRecord, km_reading: e.target.value})} />
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button className="btn btn-ghost" onClick={() => setEditRecord(null)}>İptal</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleUpdate}>Güncelle</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* NEW FUEL MODAL */}
       {showAddModal && (

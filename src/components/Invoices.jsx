@@ -24,6 +24,7 @@ const Invoices = ({ initialView = 'list' }) => {
   const [view, setView] = useState(initialView);
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState([]);
+  const [openMenuId, setOpenMenuId] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -68,6 +69,13 @@ const Invoices = ({ initialView = 'list' }) => {
         allocation_id: ''
       }]
     });
+  };
+
+  const handleDelete = async (id, record) => {
+    if (!window.confirm(`"${record.invoice_no || id}" silinecek. Emin misin?`)) return;
+    const { error } = await supabase.from('invoices').delete().eq('id', id);
+    if (error) { alert('Silme hatası: ' + error.message); return; }
+    fetchData();
   };
 
   const handleSaveInvoice = async () => {
@@ -390,8 +398,21 @@ const Invoices = ({ initialView = 'list' }) => {
                   </td>
                   <td style={{ fontWeight: '800', color: 'var(--primary)' }}>₺{i.total_amount.toLocaleString()}</td>
                   <td><span className="badge badge-success">{i.status}</span></td>
-                  <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
-                    <button className="btn btn-ghost"><MoreVertical size={16} /></button>
+                  <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
+                    <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === i.id ? null : i.id); }}>
+                      <MoreVertical size={16} />
+                    </button>
+                    {openMenuId === i.id && (
+                      <div style={{ position: 'absolute', right: '1rem', top: '100%', background: 'white', border: '1px solid var(--border)', borderRadius: '10px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)', zIndex: 100, minWidth: '140px', overflow: 'hidden' }}
+                        onMouseLeave={() => setOpenMenuId(null)}>
+                        <button onClick={() => { setOpenMenuId(null); handleDelete(i.id, i); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--danger)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.07)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          🗑️ Sil
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
