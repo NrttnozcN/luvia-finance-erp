@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Vehicles from './components/Vehicles';
 import Customers from './components/Customers';
@@ -58,6 +58,12 @@ const App = () => {
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportForm, setSupportForm] = useState({ title: '', description: '' });
   const [supportSending, setSupportSending] = useState(false);
+  const [notifications, setNotifications] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('luvia_notifications') || '[]'); }
+    catch { return []; }
+  });
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const unreadCount = notifications.filter(n => !n.read).length;
   const [stats, setStats] = useState({
     totalSales: 0,
     vehicleCount: 0,
@@ -98,6 +104,59 @@ const App = () => {
   useEffect(() => {
     if (currentUser) fetchDashboardStats();
   }, [currentUser, activeModule]);
+
+  useEffect(() => {
+    if (currentUser?.role !== 'Admin') return;
+    if (Notification.permission === 'default') Notification.requestPermission();
+
+    const channel = supabase
+      .channel('admin-tickets-watch')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_tickets' }, (payload) => {
+        const ticket = payload.new;
+        const notif = {
+          id: `${ticket.id}-${Date.now()}`,
+          title: 'Yeni Destek Talebi',
+          body: `${ticket.user_name}: ${ticket.title}`,
+          time: new Date().toISOString(),
+          read: false,
+          tab: 'support_tickets',
+        };
+        if (Notification.permission === 'granted') {
+          new Notification(notif.title, { body: notif.body });
+        }
+        setNotifications(prev => {
+          const updated = [notif, ...prev].slice(0, 50);
+          localStorage.setItem('luvia_notifications', JSON.stringify(updated));
+          return updated;
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentUser]);
+
+  const markAllRead = () => {
+    setNotifications(prev => {
+      const updated = prev.map(n => ({ ...n, read: true }));
+      localStorage.setItem('luvia_notifications', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const clearNotifications = () => {
+    localStorage.removeItem('luvia_notifications');
+    setNotifications([]);
+  };
+
+  const handleNotifClick = (notif) => {
+    setNotifications(prev => {
+      const updated = prev.map(n => n.id === notif.id ? { ...n, read: true } : n);
+      localStorage.setItem('luvia_notifications', JSON.stringify(updated));
+      return updated;
+    });
+    setActiveModule(notif.tab);
+    setShowNotifPanel(false);
+  };
 
   const handleSearch = async (q) => {
     setSearchQuery(q);
@@ -308,10 +367,57 @@ const App = () => {
             <button className="btn btn-primary" style={{ background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', borderRadius: '10px' }} onClick={() => setActiveModule('invoices-create')}>
               <Plus size={18} /> Fiş İşle
             </button>
-            <button className="icon-btn" onClick={() => setActiveModule('alert-center')}>
-              <Bell size={20} />
-              <span className="notification-dot"></span>
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button className="icon-btn" style={{ position: 'relative' }} onClick={() => setShowNotifPanel(s => !s)}>
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span style={{ position: 'absolute', top: '-5px', right: '-5px', background: 'var(--danger)', color: 'white', borderRadius: '10px', padding: '0.1rem 0.38rem', fontSize: '0.62rem', fontWeight: '800', minWidth: '16px', textAlign: 'center', lineHeight: '1.4' }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {showNotifPanel && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: '360px', background: 'white', border: '1px solid var(--border)', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', zIndex: 1000, overflow: 'hidden' }}
+                  onMouseLeave={() => {}}>
+                  <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--text)' }}>Bildirimler</h3>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                      {unreadCount > 0 && (
+                        <button onClick={markAllRead} style={{ fontSize: '0.75rem', color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '700' }}>Tümünü Okundu</button>
+                      )}
+                      {notifications.length > 0 && (
+                        <button onClick={clearNotifications} style={{ fontSize: '0.75rem', color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer' }}>Temizle</button>
+                      )}
+                      <button onClick={() => setShowNotifPanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex' }}>✕</button>
+                    </div>
+                  </div>
+                  <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
+                    {notifications.length === 0 ? (
+                      <p style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-dim)', fontSize: '0.85rem' }}>Bildirim bulunmuyor</p>
+                    ) : notifications.map((notif, i) => (
+                      <button key={i} onClick={() => handleNotifClick(notif)}
+                        style={{ display: 'block', width: '100%', padding: '0.9rem 1.25rem', background: notif.read ? 'none' : 'rgba(255,107,0,0.05)', border: 'none', borderBottom: '1px solid var(--bg-main)', cursor: 'pointer', textAlign: 'left' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                        onMouseLeave={e => e.currentTarget.style.background = notif.read ? 'none' : 'rgba(255,107,0,0.05)'}>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: notif.read ? 'var(--border)' : 'var(--primary)', flexShrink: 0, marginTop: '5px' }} />
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontWeight: '700', fontSize: '0.85rem', marginBottom: '2px', color: 'var(--text)' }}>{notif.title}</p>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{notif.body}</p>
+                            <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{new Date(notif.time).toLocaleString('tr-TR')}</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ padding: '0.75rem', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+                    <button onClick={() => { setActiveModule('support_tickets'); setShowNotifPanel(false); }} style={{ fontSize: '0.82rem', color: 'var(--primary)', fontWeight: '700', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      Tüm Destek Taleplerini Gör →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="user-profile" onClick={() => setActiveModule('settings')}>
               <div className="avatar">{getInitials(currentUser?.name)}</div>
               <div className="user-info">
