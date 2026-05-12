@@ -22,10 +22,12 @@ const CustomerMovementReport = () => {
     setSelectedName(custName);
     setLoading(true);
 
-    const [{ data: invs }, { data: txns }] = await Promise.all([
-      supabase.from('invoices').select('id, invoice_no, date, total_amount, description, status').eq('customer_id', custId).order('date'),
-      supabase.from('finance_transactions').select('id, date, amount, type, description').eq('customer_id', custId).order('date').then(r => ({ data: r.data || [] })),
+    const [{ data: invs }, txnRes, { data: chks }] = await Promise.all([
+      supabase.from('invoices').select('id, invoice_no, date, total_amount, description').eq('customer_id', custId).order('date'),
+      supabase.from('finance_transactions').select('id, date, amount, type, description').eq('customer_id', custId).order('date').catch(() => ({ data: [] })),
+      supabase.from('checks').select('id, due_date, amount, type, bank_name, status').eq('customer_id', custId).order('due_date'),
     ]);
+    const txns = txnRes?.data || [];
 
     const rows = [
       ...(invs || []).map(inv => ({
@@ -35,13 +37,23 @@ const CustomerMovementReport = () => {
         alacak: 0,
         type: 'invoice',
       })),
-      ...(txns || []).map(tx => ({
+      ...(txns).map(tx => ({
         date: tx.date,
         description: `${tx.type}${tx.description ? ' – ' + tx.description : ''}`,
         borc: ['Ödeme', 'Gider'].includes(tx.type) ? Number(tx.amount) : 0,
         alacak: ['Tahsilat', 'Gelir'].includes(tx.type) ? Number(tx.amount) : 0,
         type: 'payment',
       })),
+      ...(chks || []).map(chk => {
+        const isAlacak = ['Müşteri Çeki', 'Müşteri Senedi'].includes(chk.type);
+        return {
+          date: chk.due_date,
+          description: `${chk.type}${chk.bank_name ? ' – ' + chk.bank_name : ''} (${chk.status})`,
+          borc:   isAlacak ? 0 : Number(chk.amount),
+          alacak: isAlacak ? Number(chk.amount) : 0,
+          type: 'check',
+        };
+      }),
     ].sort((a, b) => new Date(a.date) - new Date(b.date));
 
     let bal = 0;
@@ -141,6 +153,9 @@ const CustomerMovementReport = () => {
                               width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
                               background: m.borc > 0 ? 'var(--danger)' : 'var(--success)'
                             }} />
+                            {m.type === 'check' && (
+                              <span style={{ fontSize: '0.68rem', fontWeight: '700', padding: '0.1rem 0.4rem', borderRadius: '4px', background: '#e0f2fe', color: '#075985', flexShrink: 0 }}>ÇEK</span>
+                            )}
                             {m.description}
                           </div>
                         </td>
