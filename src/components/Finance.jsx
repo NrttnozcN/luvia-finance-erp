@@ -52,19 +52,19 @@ const Finance = () => {
   const handleSave = async () => {
     const { error } = await supabase
       .from('finance_transactions')
-      .insert([newTransaction]);
+      .insert([{ ...newTransaction, customer_id: newTransaction.customer_id || null, amount: Number(newTransaction.amount) }]);
 
     if (error) alert(error.message);
     else {
       setShowAddModal(false);
       fetchData();
-      setNewTransaction({ type: 'Ödeme', account_type: 'Kasa', account_name: 'Merkez Kasa', amount: 0, customer_id: '', description: '' });
+      setNewTransaction({ type: 'Ödeme', account_type: 'Kasa', account_name: '', amount: 0, customer_id: '', description: '' });
     }
   };
 
   const handleUpdate = async () => {
     const { id, customers: _c, ...fields } = editRecord;
-    const { error } = await supabase.from('finance_transactions').update(fields).eq('id', id);
+    const { error } = await supabase.from('finance_transactions').update({ ...fields, customer_id: fields.customer_id || null, amount: Number(fields.amount) }).eq('id', id);
     if (error) { alert('Güncelleme hatası: ' + error.message); return; }
     setEditRecord(null);
     fetchData();
