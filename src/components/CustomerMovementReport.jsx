@@ -21,45 +21,54 @@ const CustomerMovementReport = () => {
     setSelectedId(custId);
     setSelectedName(custName);
     setLoading(true);
+    setMovements([]);
 
-    const [{ data: invs }, txnRes, { data: chks }] = await Promise.all([
-      supabase.from('invoices').select('id, invoice_no, date, total_amount, description').eq('customer_id', custId).order('date'),
-      supabase.from('finance_transactions').select('id, date, amount, type, description').eq('customer_id', custId).order('date').catch(() => ({ data: [] })),
-      supabase.from('checks').select('id, due_date, amount, type, bank_name, status').eq('customer_id', custId).order('due_date'),
-    ]);
-    const txns = txnRes?.data || [];
+    try {
+      const [invRes, txnRes, chkRes] = await Promise.all([
+        supabase.from('invoices').select('id, invoice_no, date, total_amount, description').eq('customer_id', custId).order('date'),
+        supabase.from('finance_transactions').select('id, date, amount, type, description').eq('customer_id', custId).order('date'),
+        supabase.from('checks').select('id, due_date, amount, type, bank_name, status').eq('customer_id', custId).order('due_date'),
+      ]);
 
-    const rows = [
-      ...(invs || []).map(inv => ({
-        date: inv.date,
-        description: `Fatura #${inv.invoice_no}${inv.description ? ' – ' + inv.description : ''}`,
-        borc: Number(inv.total_amount),
-        alacak: 0,
-        type: 'invoice',
-      })),
-      ...(txns).map(tx => ({
-        date: tx.date,
-        description: `${tx.type}${tx.description ? ' – ' + tx.description : ''}`,
-        borc: ['Ödeme', 'Gider'].includes(tx.type) ? Number(tx.amount) : 0,
-        alacak: ['Tahsilat', 'Gelir'].includes(tx.type) ? Number(tx.amount) : 0,
-        type: 'payment',
-      })),
-      ...(chks || []).map(chk => {
-        const isAlacak = ['Müşteri Çeki', 'Müşteri Senedi'].includes(chk.type);
-        return {
-          date: chk.due_date,
-          description: `${chk.type}${chk.bank_name ? ' – ' + chk.bank_name : ''} (${chk.status})`,
-          borc:   isAlacak ? 0 : Number(chk.amount),
-          alacak: isAlacak ? Number(chk.amount) : 0,
-          type: 'check',
-        };
-      }),
-    ].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const invs = invRes?.data || [];
+      const txns = txnRes?.data || [];
+      const chks = chkRes?.data || [];
 
-    let bal = 0;
-    const withBal = rows.map(r => { bal += r.borc - r.alacak; return { ...r, balance: bal }; });
-    setMovements(withBal);
-    setLoading(false);
+      const rows = [
+        ...invs.map(inv => ({
+          date: inv.date,
+          description: `Fatura #${inv.invoice_no}${inv.description ? ' – ' + inv.description : ''}`,
+          borc: Number(inv.total_amount),
+          alacak: 0,
+          type: 'invoice',
+        })),
+        ...txns.map(tx => ({
+          date: tx.date,
+          description: `${tx.type}${tx.description ? ' – ' + tx.description : ''}`,
+          borc: ['Ödeme', 'Gider'].includes(tx.type) ? Number(tx.amount) : 0,
+          alacak: ['Tahsilat', 'Gelir'].includes(tx.type) ? Number(tx.amount) : 0,
+          type: 'payment',
+        })),
+        ...chks.map(chk => {
+          const isAlacak = ['Müşteri Çeki', 'Müşteri Senedi'].includes(chk.type);
+          return {
+            date: chk.due_date,
+            description: `${chk.type}${chk.bank_name ? ' – ' + chk.bank_name : ''} (${chk.status})`,
+            borc:   isAlacak ? 0 : Number(chk.amount),
+            alacak: isAlacak ? Number(chk.amount) : 0,
+            type: 'check',
+          };
+        }),
+      ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      let bal = 0;
+      const withBal = rows.map(r => { bal += r.borc - r.alacak; return { ...r, balance: bal }; });
+      setMovements(withBal);
+    } catch (err) {
+      console.error('Cari hareket yüklenemedi:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const totalBorc   = movements.reduce((a, m) => a + m.borc, 0);
