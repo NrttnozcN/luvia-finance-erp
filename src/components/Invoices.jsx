@@ -296,8 +296,8 @@ const Invoices = ({ initialView = 'list' }) => {
 
           <div className="col-span-1">
             <div className="card" style={{ position: 'sticky', top: '2rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Fatura Bilgileri</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <h3 style={{ marginBottom: '1.75rem' }}>Fatura Bilgileri</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
                 {/* İşlem Türü */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -479,7 +479,7 @@ const Invoices = ({ initialView = 'list' }) => {
 
 const InputGroup = ({ label, placeholder, type, value, onChange }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-    <label className="label-sm">{label}</label>
+    <label className="label-sm" style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-muted)' }}>{label}</label>
     <input type={type || 'text'} className="input" placeholder={placeholder} value={value} onChange={onChange} />
   </div>
 );

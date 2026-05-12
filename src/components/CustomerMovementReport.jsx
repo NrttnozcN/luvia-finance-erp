@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Download } from 'lucide-react';
+import { Users, Download, FileSearch } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const fmt = (n) => Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -11,12 +11,14 @@ const CustomerMovementReport = () => {
   const [selectedName, setSelectedName] = useState('');
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     supabase.from('customers').select('id, name').order('name').then(({ data }) => setCustomers(data || []));
   }, []);
 
-  const fetchMovements = async (custId, custName) => {
+  const fetchMovements = async (custId, custName, sd, ed) => {
     if (!custId) return;
     setSelectedId(custId);
     setSelectedName(custName);
@@ -24,11 +26,14 @@ const CustomerMovementReport = () => {
     setMovements([]);
 
     try {
-      const [invRes, txnRes, chkRes] = await Promise.all([
-        supabase.from('invoices').select('id, invoice_no, date, total_amount, description').eq('customer_id', custId).order('date'),
-        supabase.from('finance_transactions').select('id, date, amount, type, description').eq('customer_id', custId).order('date'),
-        supabase.from('checks').select('id, check_no, due_date, amount, type, bank_name, status').eq('customer_id', custId).order('due_date'),
-      ]);
+      let invQ = supabase.from('invoices').select('id, invoice_no, date, total_amount, description').eq('customer_id', custId).order('date');
+      let txnQ = supabase.from('finance_transactions').select('id, date, amount, type, description').eq('customer_id', custId).order('date');
+      let chkQ = supabase.from('checks').select('id, check_no, due_date, amount, type, bank_name, status').eq('customer_id', custId).order('due_date');
+
+      if (sd) { invQ = invQ.gte('date', sd); txnQ = txnQ.gte('date', sd); chkQ = chkQ.gte('due_date', sd); }
+      if (ed) { invQ = invQ.lte('date', ed); txnQ = txnQ.lte('date', ed); chkQ = chkQ.lte('due_date', ed); }
+
+      const [invRes, txnRes, chkRes] = await Promise.all([invQ, txnQ, chkQ]);
 
       const invs = invRes?.data || [];
       const txns = txnRes?.data || [];
@@ -143,23 +148,37 @@ const CustomerMovementReport = () => {
         <p className="text-muted">Cari hesap borç, alacak ve bakiye hareketleri</p>
       </header>
 
-      {/* Cari seçici */}
-      <div className="card" style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Cari Seçin</label>
-          <select className="input" value={selectedId} onChange={e => {
-            const opt = e.target.options[e.target.selectedIndex];
-            fetchMovements(e.target.value, opt.text);
-          }}>
-            <option value="">Cari seçiniz...</option>
-            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-        {selectedId && (
-          <button className="btn btn-ghost" onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Download size={16} /> Yazdır / PDF
+      {/* Filtre kartı */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ flex: 2, minWidth: '200px' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Cari Seçin</label>
+            <select className="input" value={selectedId} onChange={e => {
+              const opt = e.target.options[e.target.selectedIndex];
+              fetchMovements(e.target.value, opt.text, startDate, endDate);
+            }}>
+              <option value="">Cari seçiniz...</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: 1, minWidth: '140px' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Başlangıç</label>
+            <input type="date" className="input" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          </div>
+          <div style={{ flex: 1, minWidth: '140px' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Bitiş</label>
+            <input type="date" className="input" value={endDate} onChange={e => setEndDate(e.target.value)} />
+          </div>
+          <button className="btn btn-primary" disabled={!selectedId} onClick={() => fetchMovements(selectedId, selectedName, startDate, endDate)}
+            style={{ opacity: selectedId ? 1 : 0.5 }}>
+            Filtrele
           </button>
-        )}
+          {selectedId && (
+            <button className="btn btn-ghost" onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Download size={16} /> Yazdır / PDF
+            </button>
+          )}
+        </div>
       </div>
 
       {selectedId && (
@@ -191,9 +210,15 @@ const CustomerMovementReport = () => {
               {selectedName} — Hareket Detayı
             </h3>
             {loading ? (
-              <p className="text-muted" style={{ textAlign: 'center', padding: '3rem' }}>Yükleniyor...</p>
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>Yükleniyor...</div>
             ) : movements.length === 0 ? (
-              <p className="text-dim" style={{ textAlign: 'center', padding: '3rem' }}>Bu cariye ait hareket bulunamadı.</p>
+              <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+                <div style={{ width: '60px', height: '60px', background: 'var(--bg-main)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+                  <FileSearch size={26} style={{ color: 'var(--text-dim)' }} />
+                </div>
+                <p style={{ fontWeight: '700', color: 'var(--text-dim)', fontSize: '0.95rem', marginBottom: '0.35rem' }}>Hareket bulunamadı</p>
+                <p style={{ color: 'var(--text-dim)', fontSize: '0.82rem' }}>Seçili cari ve tarih kriterlerine uygun kayıt yok.</p>
+              </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>

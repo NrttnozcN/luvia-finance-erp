@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Receipt, Package, Settings, Building2, Wallet,
   Truck, Fuel, Disc, FileSpreadsheet, Briefcase, History, ShoppingCart,
   TrendingDown, FileText, BarChart3, Bell, RefreshCcw, ShieldCheck,
-  FolderOpen, PieChart, LogOut, ChevronDown, MessageCircle, TrendingUp,
+  FolderOpen, PieChart, LogOut, ChevronDown, ChevronRight, MessageCircle, TrendingUp,
 } from 'lucide-react';
 import useAuthStore, { ROLE_PERMISSIONS } from '../store/authStore';
 import { supabase } from '../lib/supabase';
@@ -78,6 +78,23 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
   const canAccess = useAuthStore(s => s.canAccess);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [openTickets, setOpenTickets] = useState(0);
+  const [openGroups, setOpenGroups] = useState(() => {
+    const init = {};
+    NAV_GROUPS.forEach(g => {
+      if (g.items.some(item => item.tab === activeTab)) init[g.label] = true;
+    });
+    return init;
+  });
+
+  useEffect(() => {
+    NAV_GROUPS.forEach(g => {
+      if (g.items.some(item => item.tab === activeTab)) {
+        setOpenGroups(prev => ({ ...prev, [g.label]: true }));
+      }
+    });
+  }, [activeTab]);
+
+  const toggleGroup = (label) => setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }));
 
   const roleMeta = currentUser ? ROLE_PERMISSIONS[currentUser.role] : null;
 
@@ -106,10 +123,19 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
         {NAV_GROUPS.map(group => {
           const visibleItems = group.items.filter(item => canAccess(item.tab));
           if (visibleItems.length === 0) return null;
+          const isOpen = !!openGroups[group.label];
           return (
             <div key={group.label}>
-              <div className="nav-group-label">{group.label}</div>
-              {visibleItems.map(item => (
+              <button
+                onClick={() => toggleGroup(group.label)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '0.55rem 0.5rem 0.3rem', marginTop: '0.25rem' }}
+              >
+                <span className="nav-group-label" style={{ margin: 0, padding: 0 }}>{group.label}</span>
+                {isOpen
+                  ? <ChevronDown size={12} style={{ color: '#475569', flexShrink: 0 }} />
+                  : <ChevronRight size={12} style={{ color: '#475569', flexShrink: 0 }} />}
+              </button>
+              {isOpen && visibleItems.map(item => (
                 <NavItem
                   key={item.tab}
                   icon={item.icon}

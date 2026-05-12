@@ -621,7 +621,7 @@ const Vehicles = () => {
             </div>
 
             <SectionLabel>Teknik Detaylar</SectionLabel>
-            <div className="grid grid-cols-3" style={{ gap: '1rem', marginBottom: '1.25rem' }}>
+            <div className="grid grid-cols-3" style={{ gap: '1rem', marginBottom: '1.25rem', alignItems: 'end' }}>
               <div style={col}>
                 <label className="label-sm">Araç Tipi</label>
                 <select className="input" value={newVehicle.vehicle_type} onChange={e => setNewVehicle({ ...newVehicle, vehicle_type: e.target.value })}>
@@ -640,7 +640,7 @@ const Vehicles = () => {
                   <option>İkinci El</option><option>Sıfır</option>
                 </select>
               </div>
-              <IG label="Ort. Yakıt Tüketimi (L/100km)" type="number" placeholder="Opsiyonel" value={newVehicle.avg_fuel_consumption} onChange={e => setNewVehicle({ ...newVehicle, avg_fuel_consumption: e.target.value })} />
+              <IG label="Tüketim (L/100km)" type="number" placeholder="Opsiyonel" value={newVehicle.avg_fuel_consumption} onChange={e => setNewVehicle({ ...newVehicle, avg_fuel_consumption: e.target.value })} />
               <IG label="Güncel Kilometre" type="number" value={newVehicle.current_km} onChange={e => setNewVehicle({ ...newVehicle, current_km: e.target.value })} />
             </div>
 
@@ -689,7 +689,7 @@ const Vehicles = () => {
             </div>
 
             <SectionLabel>Teknik Detaylar</SectionLabel>
-            <div className="grid grid-cols-3" style={{ gap: '1rem', marginBottom: '1.25rem' }}>
+            <div className="grid grid-cols-3" style={{ gap: '1rem', marginBottom: '1.25rem', alignItems: 'end' }}>
               <div style={col}>
                 <label className="label-sm">Araç Tipi</label>
                 <select className="input" value={editRecord.vehicle_type || 'Çekici'} onChange={e => setEditRecord({ ...editRecord, vehicle_type: e.target.value })}>
@@ -708,7 +708,7 @@ const Vehicles = () => {
                   <option>İkinci El</option><option>Sıfır</option>
                 </select>
               </div>
-              <IG label="Ort. Yakıt Tüketimi (L/100km)" type="number" placeholder="Opsiyonel" value={editRecord.avg_fuel_consumption || ''} onChange={e => setEditRecord({ ...editRecord, avg_fuel_consumption: e.target.value })} />
+              <IG label="Tüketim (L/100km)" type="number" placeholder="Opsiyonel" value={editRecord.avg_fuel_consumption || ''} onChange={e => setEditRecord({ ...editRecord, avg_fuel_consumption: e.target.value })} />
               <IG label="Güncel Kilometre" type="number" value={editRecord.current_km || 0} onChange={e => setEditRecord({ ...editRecord, current_km: e.target.value })} />
             </div>
 
