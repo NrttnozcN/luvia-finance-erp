@@ -13,8 +13,11 @@ import {
   Warehouse
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const Stock = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stockMovements, setStockMovements] = useState([]);
@@ -33,7 +36,7 @@ const Stock = () => {
     setLoading(true);
     
     // Malzemeleri çek (Dropdown için)
-    const { data: mats } = await supabase.from('materials').select('*');
+    const { data: mats } = await supabase.from('materials').select('*').eq('company_id', cid);
     setMaterials(mats || []);
 
     // Hareketleri çek (Join ile malzeme adını al)
@@ -55,7 +58,7 @@ const Stock = () => {
   const handleSave = async () => {
     const { error } = await supabase
       .from('stock_movements')
-      .insert([newMovement]);
+      .insert([{ ...newMovement, company_id: cid }]);
 
     if (error) alert('Hata: ' + error.message);
     else {

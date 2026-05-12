@@ -14,8 +14,11 @@ import {
   Droplets
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const Fuel = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fuelLogs, setFuelLogs] = useState([]);
@@ -32,8 +35,8 @@ const Fuel = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: logs } = await supabase.from('fuel_logs').select('*, vehicles(plate)').order('created_at', { ascending: false });
-    const { data: vehs } = await supabase.from('vehicles').select('*');
+    const { data: logs } = await supabase.from('fuel_logs').select('*, vehicles(plate)').eq('company_id', cid).order('created_at', { ascending: false });
+    const { data: vehs } = await supabase.from('vehicles').select('*').eq('company_id', cid);
     setFuelLogs(logs || []);
     setVehicles(vehs || []);
     setLoading(false);
@@ -46,7 +49,7 @@ const Fuel = () => {
   const handleSave = async () => {
     const { error } = await supabase
       .from('fuel_logs')
-      .insert([newLog]);
+      .insert([{ ...newLog, company_id: cid }]);
 
     if (error) alert(error.message);
     else {

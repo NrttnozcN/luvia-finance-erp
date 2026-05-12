@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Download, FileSearch } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const fmt = (n) => Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
 
 const CustomerMovementReport = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
+
   const [customers, setCustomers] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [selectedName, setSelectedName] = useState('');
@@ -15,8 +19,8 @@ const CustomerMovementReport = () => {
   const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
-    supabase.from('customers').select('id, name').order('name').then(({ data }) => setCustomers(data || []));
-  }, []);
+    supabase.from('customers').select('id, name').eq('company_id', cid).order('name').then(({ data }) => setCustomers(data || []));
+  }, [cid]);
 
   const fetchMovements = async (custId, custName, sd, ed) => {
     if (!custId) return;

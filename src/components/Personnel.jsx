@@ -16,8 +16,11 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const Personnel = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState([]);
@@ -37,6 +40,7 @@ const Personnel = () => {
     const { data, error } = await supabase
       .from('personnel')
       .select('*')
+      .eq('company_id', cid)
       .order('full_name', { ascending: true });
 
     if (error) console.error(error);
@@ -51,7 +55,7 @@ const Personnel = () => {
   const handleSave = async () => {
     const { error } = await supabase
       .from('personnel')
-      .insert([newStaff]);
+      .insert([{ ...newStaff, company_id: cid }]);
 
     if (error) alert(error.message);
     else {

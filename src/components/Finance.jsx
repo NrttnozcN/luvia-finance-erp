@@ -16,8 +16,11 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const Finance = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
@@ -36,9 +39,9 @@ const Finance = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: trans } = await supabase.from('finance_transactions').select('*, customers(name)').order('created_at', { ascending: false });
-    const { data: custs } = await supabase.from('customers').select('*');
-    const { data: kslar } = await supabase.from('kasalar').select('*').order('name');
+    const { data: trans } = await supabase.from('finance_transactions').select('*, customers(name)').eq('company_id', cid).order('created_at', { ascending: false });
+    const { data: custs } = await supabase.from('customers').select('*').eq('company_id', cid);
+    const { data: kslar } = await supabase.from('kasalar').select('*').eq('company_id', cid).order('name');
     setTransactions(trans || []);
     setCustomers(custs || []);
     setKasalar(kslar || []);
@@ -52,7 +55,7 @@ const Finance = () => {
   const handleSave = async () => {
     const { error } = await supabase
       .from('finance_transactions')
-      .insert([{ ...newTransaction, customer_id: newTransaction.customer_id || null, amount: Number(newTransaction.amount) }]);
+      .insert([{ ...newTransaction, customer_id: newTransaction.customer_id || null, amount: Number(newTransaction.amount), company_id: cid }]);
 
     if (error) alert(error.message);
     else {

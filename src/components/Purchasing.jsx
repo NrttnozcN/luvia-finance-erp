@@ -14,8 +14,11 @@ import {
   Calendar
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const Purchasing = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState([]);
@@ -31,8 +34,8 @@ const Purchasing = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: reqs } = await supabase.from('purchase_requests').select('*, materials(name)').order('created_at', { ascending: false });
-    const { data: mats } = await supabase.from('materials').select('*');
+    const { data: reqs } = await supabase.from('purchase_requests').select('*, materials(name)').eq('company_id', cid).order('created_at', { ascending: false });
+    const { data: mats } = await supabase.from('materials').select('*').eq('company_id', cid);
     setRequests(reqs || []);
     setMaterials(mats || []);
     setLoading(false);
@@ -45,7 +48,7 @@ const Purchasing = () => {
   const handleSave = async () => {
     const { error } = await supabase
       .from('purchase_requests')
-      .insert([newRequest]);
+      .insert([{ ...newRequest, company_id: cid }]);
 
     if (error) alert(error.message);
     else {

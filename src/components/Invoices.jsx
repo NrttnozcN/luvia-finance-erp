@@ -19,8 +19,12 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const Invoices = ({ initialView = 'list' }) => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
+
   const [view, setView] = useState(initialView);
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState([]);
@@ -41,10 +45,10 @@ const Invoices = ({ initialView = 'list' }) => {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: invs } = await supabase.from('invoices').select('*, customers(name)').order('created_at', { ascending: false });
-    const { data: custs } = await supabase.from('customers').select('*');
-    const { data: mats } = await supabase.from('materials').select('*');
-    const { data: vehs } = await supabase.from('vehicles').select('*');
+    const { data: invs } = await supabase.from('invoices').select('*, customers(name)').eq('company_id', cid).order('created_at', { ascending: false });
+    const { data: custs } = await supabase.from('customers').select('*').eq('company_id', cid);
+    const { data: mats } = await supabase.from('materials').select('*').eq('company_id', cid);
+    const { data: vehs } = await supabase.from('vehicles').select('*').eq('company_id', cid);
     
     setInvoices(invs || []);
     setCustomers(custs || []);

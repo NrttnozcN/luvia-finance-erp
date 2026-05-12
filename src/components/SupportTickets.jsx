@@ -20,9 +20,10 @@ const SupportTickets = () => {
 
   const fetchTickets = async () => {
     setLoading(true);
+    const baseQ = supabase.from('support_tickets').select('*').eq('company_id', currentUser?.company_id);
     const query = isAdmin
-      ? supabase.from('support_tickets').select('*').order('created_at', { ascending: false })
-      : supabase.from('support_tickets').select('*').eq('user_id', currentUser?.id).order('created_at', { ascending: false });
+      ? baseQ.order('created_at', { ascending: false })
+      : baseQ.eq('user_id', currentUser?.id).order('created_at', { ascending: false });
     const { data } = await query;
     setTickets(data || []);
     setLoading(false);

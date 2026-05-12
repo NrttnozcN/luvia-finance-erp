@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Plus, MapPin, Warehouse, ChevronRight, X, Package, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const Facilities = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
   const [facilities, setFacilities] = useState([]);
   const [stockCount, setStockCount] = useState(0);
   const [personnelCount, setPersonnelCount] = useState(0);
@@ -16,9 +19,9 @@ const Facilities = () => {
       { count: stk },
       { count: pers },
     ] = await Promise.all([
-      supabase.from('facilities').select('*').order('created_at', { ascending: false }),
-      supabase.from('materials').select('*', { count: 'exact', head: true }),
-      supabase.from('personnel').select('*', { count: 'exact', head: true }),
+      supabase.from('facilities').select('*').eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('materials').select('*', { count: 'exact', head: true }).eq('company_id', cid),
+      supabase.from('personnel').select('*', { count: 'exact', head: true }).eq('company_id', cid),
     ]);
     setFacilities(facs || []);
     setStockCount(stk || 0);
@@ -31,7 +34,7 @@ const Facilities = () => {
   }, []);
 
   const handleSaveFacility = async (form) => {
-    const { error } = await supabase.from('facilities').insert([{ ...form, status: 'Aktif' }]);
+    const { error } = await supabase.from('facilities').insert([{ ...form, status: 'Aktif', company_id: cid }]);
     if (error) alert(error.message);
     else {
       setShowAddModal(false);

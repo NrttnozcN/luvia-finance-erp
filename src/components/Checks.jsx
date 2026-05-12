@@ -15,8 +15,11 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const Checks = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [checks, setChecks] = useState([]);
@@ -38,8 +41,8 @@ const Checks = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: chks } = await supabase.from('checks').select('*, customers(name)').order('due_date', { ascending: true });
-    const { data: custs } = await supabase.from('customers').select('*');
+    const { data: chks } = await supabase.from('checks').select('*, customers(name)').eq('company_id', cid).order('due_date', { ascending: true });
+    const { data: custs } = await supabase.from('customers').select('*').eq('company_id', cid);
     setChecks(chks || []);
     setCustomers(custs || []);
     setLoading(false);
@@ -64,6 +67,7 @@ const Checks = () => {
       bank_name: newCheck.bank_name,
       customer_id: newCheck.customer_id || null,
       status: newCheck.status,
+      company_id: cid,
     };
     const { error } = await supabase.from('checks').insert([payload]);
     if (error) alert(error.message);

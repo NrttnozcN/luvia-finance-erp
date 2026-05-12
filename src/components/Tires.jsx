@@ -14,8 +14,11 @@ import {
   X
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const Tires = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tireMovements, setTireMovements] = useState([]);
@@ -32,8 +35,8 @@ const Tires = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: moves } = await supabase.from('tire_movements').select('*, vehicles(plate)').order('created_at', { ascending: false });
-    const { data: vehs } = await supabase.from('vehicles').select('*');
+    const { data: moves } = await supabase.from('tire_movements').select('*, vehicles(plate)').eq('company_id', cid).order('created_at', { ascending: false });
+    const { data: vehs } = await supabase.from('vehicles').select('*').eq('company_id', cid);
     setTireMovements(moves || []);
     setVehicles(vehs || []);
     setLoading(false);
@@ -46,7 +49,7 @@ const Tires = () => {
   const handleSave = async () => {
     const { error } = await supabase
       .from('tire_movements')
-      .insert([newMovement]);
+      .insert([{ ...newMovement, company_id: cid }]);
 
     if (error) alert(error.message);
     else {

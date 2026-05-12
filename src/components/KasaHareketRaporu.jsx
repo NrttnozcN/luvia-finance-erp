@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const fmt  = (n) => Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtD = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
 
 const KasaHareketRaporu = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
+
   const [kasalar,       setKasalar]       = useState([]);
   const [selectedKasa,  setSelectedKasa]  = useState('');
   const [movements,     setMovements]     = useState([]);
@@ -14,8 +18,8 @@ const KasaHareketRaporu = () => {
   const [endDate,       setEndDate]       = useState('');
 
   useEffect(() => {
-    supabase.from('kasalar').select('*').order('name').then(({ data }) => setKasalar(data || []));
-  }, []);
+    supabase.from('kasalar').select('*').eq('company_id', cid).order('name').then(({ data }) => setKasalar(data || []));
+  }, [cid]);
 
   const fetchMovements = async (kasaName, sd, ed) => {
     if (!kasaName) return;
@@ -25,6 +29,7 @@ const KasaHareketRaporu = () => {
       let q = supabase
         .from('finance_transactions')
         .select('id, date, type, amount, description, account_name')
+        .eq('company_id', cid)
         .eq('account_name', kasaName)
         .order('date', { ascending: false });
 
