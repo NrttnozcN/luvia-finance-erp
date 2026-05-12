@@ -12,7 +12,7 @@ const NAV_GROUPS = [
   {
     label: 'Genel',
     items: [
-      { icon: <LayoutDashboard size={18} />, label: 'Dashboard',        tab: 'dashboard' },
+      { icon: <LayoutDashboard size={18} />, label: 'Gösterge Paneli',   tab: 'dashboard' },
       { icon: <Building2 size={18} />,       label: 'Tesisler',          tab: 'facilities' },
     ],
   },

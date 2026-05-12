@@ -26,19 +26,38 @@ const Customers = () => {
   const [newCustomer, setNewCustomer] = useState(emptyForm);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [editCustomer, setEditCustomer] = useState(null);
+  const [totalAlacak, setTotalAlacak] = useState(0);
+  const [totalBorc, setTotalBorc] = useState(0);
 
   const fetchCustomers = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .order('name', { ascending: true });
+    const [{ data: custs }, { data: invs }, { data: txns }, { data: chks }] = await Promise.all([
+      supabase.from('customers').select('*').order('name'),
+      supabase.from('invoices').select('customer_id, total_amount'),
+      supabase.from('finance_transactions').select('customer_id, amount, type'),
+      supabase.from('checks').select('customer_id, amount, type'),
+    ]);
 
-    if (error) {
-      console.error('Hata:', error);
-    } else {
-      setCustomers(data);
-    }
+    const balMap = {};
+    (invs || []).forEach(r => {
+      if (!r.customer_id) return;
+      balMap[r.customer_id] = (balMap[r.customer_id] || 0) + Number(r.total_amount);
+    });
+    (txns || []).forEach(r => {
+      if (!r.customer_id) return;
+      const delta = ['Tahsilat', 'Gelir'].includes(r.type) ? -Number(r.amount) : Number(r.amount);
+      balMap[r.customer_id] = (balMap[r.customer_id] || 0) + delta;
+    });
+    (chks || []).forEach(r => {
+      if (!r.customer_id) return;
+      const isAlacak = ['Müşteri Çeki', 'Müşteri Senedi'].includes(r.type);
+      balMap[r.customer_id] = (balMap[r.customer_id] || 0) + (isAlacak ? -Number(r.amount) : Number(r.amount));
+    });
+
+    const enriched = (custs || []).map(c => ({ ...c, computedBalance: balMap[c.id] || 0 }));
+    setCustomers(enriched);
+    setTotalAlacak(enriched.filter(c => c.computedBalance > 0).reduce((s, c) => s + c.computedBalance, 0));
+    setTotalBorc(enriched.filter(c => c.computedBalance < 0).reduce((s, c) => s + Math.abs(c.computedBalance), 0));
     setLoading(false);
   };
 
@@ -89,11 +108,11 @@ const Customers = () => {
         </div>
         <div className="card">
           <p className="text-muted" style={{ marginBottom: '0.5rem' }}>Toplam Alacak</p>
-          <h2 style={{ fontSize: '2rem', color: 'var(--success)' }}>₺120,400</h2>
+          <h2 style={{ fontSize: '2rem', color: 'var(--success)' }}>₺{totalAlacak.toLocaleString('tr-TR')}</h2>
         </div>
         <div className="card">
           <p className="text-muted" style={{ marginBottom: '0.5rem' }}>Toplam Borç</p>
-          <h2 style={{ fontSize: '2rem', color: 'var(--danger)' }}>₺45,000</h2>
+          <h2 style={{ fontSize: '2rem', color: 'var(--danger)' }}>₺{totalBorc.toLocaleString('tr-TR')}</h2>
         </div>
       </div>
 
@@ -129,7 +148,10 @@ const Customers = () => {
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>{c.email}</div>
                   </td>
                   <td><span className={`badge ${c.type === 'Müşteri' ? 'badge-success' : 'badge-primary'}`}>{c.type}</span></td>
-                  <td style={{ textAlign: 'right', fontWeight: '800' }}>₺{(c.balance || 0).toLocaleString()}</td>
+                  <td style={{ textAlign: 'right', fontWeight: '800', color: c.computedBalance > 0 ? 'var(--danger)' : c.computedBalance < 0 ? 'var(--success)' : 'var(--text-dim)' }}>
+                    ₺{Math.abs(c.computedBalance).toLocaleString('tr-TR')}
+                    {c.computedBalance !== 0 && <span style={{ fontSize: '0.72rem', marginLeft: '3px', opacity: 0.8 }}>{c.computedBalance > 0 ? 'B' : 'A'}</span>}
+                  </td>
                   <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
                     <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === c.id ? null : c.id); }}>
                       <MoreVertical size={16} />
