@@ -68,7 +68,7 @@ const useAuthStore = create(
 
         const { data: users, error } = await supabase
           .from('profiles')
-          .select('*, companies(id, name)')
+          .select('*, companies(*)')
           .eq('password', password);
 
         if (error || !users || users.length === 0) {
@@ -84,6 +84,22 @@ const useAuthStore = create(
         if (!user) {
           set({ loginError: 'Kullanıcı adı/e-posta veya şifre hatalı.' });
           return false;
+        }
+
+        // Firma lisans ve durum kontrolü (SuperAdmin için atlanır)
+        if (user.companies) {
+          if (user.companies.status === 'passive') {
+            set({ loginError: 'Firmanızın hesabı askıya alınmıştır. Lütfen Ülgen Soft ile iletişime geçin.' });
+            return false;
+          }
+          if (user.companies.license_end_date) {
+            const expiry = new Date(user.companies.license_end_date);
+            expiry.setHours(23, 59, 59, 999);
+            if (expiry < new Date()) {
+              set({ loginError: 'Lisans süreniz dolmuştur. Lütfen Ülgen Soft Yazılım ile iletişime geçin.' });
+              return false;
+            }
+          }
         }
 
         const safeUser = {
