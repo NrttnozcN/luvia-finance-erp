@@ -4,6 +4,14 @@ import { supabase } from '../lib/supabase';
 
 // ─── Rol → Modül Erişim Tablosu ──────────────────────────────────────────────
 export const ROLE_PERMISSIONS = {
+  SuperAdmin: {
+    label: 'Platform Sahibi',
+    color: '#7C3AED',
+    badgeStyle: { background: '#ede9fe', color: '#5b21b6' },
+    modules: 'all',
+    canWrite: true,
+    description: 'Platform sahibi — tüm firmalara ve modüllere tam erişim',
+  },
   Admin: {
     label: 'Süper Admin',
     color: '#FF6B00',

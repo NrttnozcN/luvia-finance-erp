@@ -148,6 +148,19 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
             </div>
           );
         })}
+
+        {currentUser?.role === 'SuperAdmin' && (
+          <div>
+            <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '0.75rem 0.5rem' }} />
+            <span className="nav-group-label" style={{ display: 'block', padding: '0.55rem 0.5rem 0.3rem', color: '#7C3AED' }}>Platform Yönetimi</span>
+            <NavItem
+              icon={<Building2 size={18} />}
+              label="Müşteri Firmalar"
+              active={activeTab === 'companies'}
+              onClick={() => setActiveTab('companies')}
+            />
+          </div>
+        )}
       </nav>
 
       {/* Alt — Kullanıcı & Çıkış */}

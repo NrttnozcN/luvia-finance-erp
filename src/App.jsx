@@ -23,6 +23,7 @@ import Facilities from './components/Facilities';
 import CustomerMovementReport from './components/CustomerMovementReport';
 import KasaHareketRaporu from './components/KasaHareketRaporu';
 import SupportTickets from './components/SupportTickets';
+import Companies from './components/Companies';
 import Login from './components/Login';
 import { 
   Bell, 
@@ -223,6 +224,7 @@ const App = () => {
       case 'cari_rapor': return <CustomerMovementReport />;
       case 'kasa_rapor': return <KasaHareketRaporu />;
       case 'support_tickets': return <SupportTickets />;
+      case 'companies': return <Companies />;
       default: return renderDashboard();
     }
   };
