@@ -156,14 +156,7 @@ const Checks = () => {
                     </div>
                   </td>
                   <td><span className={`badge ${c.type === 'Müşteri Çeki' ? 'badge-primary' : 'badge-warning'}`}>{c.type}</span></td>
-                  <td>
-                    <span style={{ fontWeight: '600' }}>{c.customers?.name || 'Genel'}</span>
-                    {c.ciro_to_customer_id && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: '2px' }}>
-                        → {customers.find(x => x.id === c.ciro_to_customer_id)?.name || '—'}
-                      </div>
-                    )}
-                  </td>
+                  <td style={{ fontWeight: '600' }}>{c.customers?.name || 'Genel'}</td>
                   <td className="text-dim">{c.bank_name}</td>
                   <td style={{ textAlign: 'right', fontWeight: '800', color: 'var(--primary)' }}>₺{c.amount.toLocaleString()}</td>
                   <td>
@@ -172,6 +165,11 @@ const Checks = () => {
                       color: c.status === 'Ciro Edildi' ? '#075985' : c.status === 'Tahsil Edildi' || c.status === 'Ödendi' ? '#166534' : '#92400e' }}>
                       {c.status || 'Portföyde'}
                     </span>
+                    {c.status === 'Ciro Edildi' && c.ciro_to_customer_id && (
+                      <div style={{ fontSize: '0.75rem', color: '#075985', fontWeight: '600', marginTop: '3px' }}>
+                        → {customers.find(x => x.id === c.ciro_to_customer_id)?.name || '—'}
+                      </div>
+                    )}
                   </td>
                   <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
                     <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === c.id ? null : c.id); }}>
