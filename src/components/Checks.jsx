@@ -35,7 +35,7 @@ const Checks = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: chks } = await supabase.from('checks').select('*, customers(name)').order('due_date', { ascending: true });
+    const { data: chks } = await supabase.from('checks').select('*, customers!checks_customer_id_fkey(name), ciro_to:customers!checks_ciro_to_customer_id_fkey(name)').order('due_date', { ascending: true });
     const { data: custs } = await supabase.from('customers').select('*');
     setChecks(chks || []);
     setCustomers(custs || []);
@@ -90,7 +90,7 @@ const Checks = () => {
     if (!ciroModal.toCustId) { alert('Lütfen ciro edilecek firmayı seçin.'); return; }
     const chk = ciroModal.check;
     const [{ error: e1 }, { error: e2 }] = await Promise.all([
-      supabase.from('checks').update({ status: 'Ciro Edildi' }).eq('id', chk.id),
+      supabase.from('checks').update({ status: 'Ciro Edildi', ciro_to_customer_id: ciroModal.toCustId }).eq('id', chk.id),
       supabase.from('checks').insert([{
         type: 'Kendi Çekimiz',
         due_date: chk.due_date,
@@ -156,7 +156,14 @@ const Checks = () => {
                     </div>
                   </td>
                   <td><span className={`badge ${c.type === 'Müşteri Çeki' ? 'badge-primary' : 'badge-warning'}`}>{c.type}</span></td>
-                  <td style={{ fontWeight: '600' }}>{c.customers?.name || 'Genel'}</td>
+                  <td>
+                    <span style={{ fontWeight: '600' }}>{c.customers?.name || 'Genel'}</span>
+                    {c.ciro_to?.name && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: '2px' }}>
+                        → {c.ciro_to.name}
+                      </div>
+                    )}
+                  </td>
                   <td className="text-dim">{c.bank_name}</td>
                   <td style={{ textAlign: 'right', fontWeight: '800', color: 'var(--primary)' }}>₺{c.amount.toLocaleString()}</td>
                   <td>
