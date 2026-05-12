@@ -56,8 +56,8 @@ const Customers = () => {
 
     const enriched = (custs || []).map(c => ({ ...c, computedBalance: balMap[c.id] || 0 }));
     setCustomers(enriched);
-    setTotalAlacak(enriched.filter(c => c.computedBalance > 0).reduce((s, c) => s + c.computedBalance, 0));
-    setTotalBorc(enriched.filter(c => c.computedBalance < 0).reduce((s, c) => s + Math.abs(c.computedBalance), 0));
+    setTotalAlacak(enriched.filter(c => c.computedBalance < 0).reduce((s, c) => s + Math.abs(c.computedBalance), 0));
+    setTotalBorc(enriched.filter(c => c.computedBalance > 0).reduce((s, c) => s + c.computedBalance, 0));
     setLoading(false);
   };
 
@@ -148,9 +148,9 @@ const Customers = () => {
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>{c.email}</div>
                   </td>
                   <td><span className={`badge ${c.type === 'Müşteri' ? 'badge-success' : 'badge-primary'}`}>{c.type}</span></td>
-                  <td style={{ textAlign: 'right', fontWeight: '800', color: c.computedBalance > 0 ? 'var(--danger)' : c.computedBalance < 0 ? 'var(--success)' : 'var(--text-dim)' }}>
+                  <td style={{ textAlign: 'right', fontWeight: '800', color: c.computedBalance < 0 ? 'var(--success)' : c.computedBalance > 0 ? 'var(--danger)' : 'var(--text-dim)' }}>
                     ₺{Math.abs(c.computedBalance).toLocaleString('tr-TR')}
-                    {c.computedBalance !== 0 && <span style={{ fontSize: '0.72rem', marginLeft: '3px', opacity: 0.8 }}>{c.computedBalance > 0 ? 'B' : 'A'}</span>}
+                    {c.computedBalance !== 0 && <span style={{ fontSize: '0.72rem', marginLeft: '3px', opacity: 0.8 }}>{c.computedBalance < 0 ? 'A' : 'B'}</span>}
                   </td>
                   <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
                     <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === c.id ? null : c.id); }}>
