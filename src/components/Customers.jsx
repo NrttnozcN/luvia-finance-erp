@@ -17,20 +17,15 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+const emptyForm = { name: '', tax_office: '', tax_no: '', phone: '', email: '', address: '', type: 'Tedarikçi', balance: 0 };
+
 const Customers = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);
-  const [newCustomer, setNewCustomer] = useState({
-    name: '',
-    tax_office: '',
-    tax_no: '',
-    phone: '',
-    email: '',
-    address: '',
-    type: 'Tedarikçi',
-    balance: 0
-  });
+  const [newCustomer, setNewCustomer] = useState(emptyForm);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [editCustomer, setEditCustomer] = useState(null);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -52,17 +47,26 @@ const Customers = () => {
   }, []);
 
   const handleSave = async () => {
-    const { error } = await supabase
-      .from('customers')
-      .insert([newCustomer]);
+    const { error } = await supabase.from('customers').insert([newCustomer]);
+    if (error) { alert('Kayıt hatası: ' + error.message); return; }
+    setShowAddModal(false);
+    fetchCustomers();
+    setNewCustomer(emptyForm);
+  };
 
-    if (error) {
-      alert('Kayıt hatası: ' + error.message);
-    } else {
-      setShowAddModal(false);
-      fetchCustomers();
-      setNewCustomer({ name: '', tax_office: '', tax_no: '', phone: '', email: '', address: '', type: 'Tedarikçi', balance: 0 });
-    }
+  const handleUpdate = async () => {
+    const { id, ...fields } = editCustomer;
+    const { error } = await supabase.from('customers').update(fields).eq('id', id);
+    if (error) { alert('Güncelleme hatası: ' + error.message); return; }
+    setEditCustomer(null);
+    fetchCustomers();
+  };
+
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`"${name}" silinecek. Emin misin?`)) return;
+    const { error } = await supabase.from('customers').delete().eq('id', id);
+    if (error) { alert('Silme hatası: ' + error.message); return; }
+    fetchCustomers();
   };
 
   return (
@@ -126,8 +130,27 @@ const Customers = () => {
                   </td>
                   <td><span className={`badge ${c.type === 'Müşteri' ? 'badge-success' : 'badge-primary'}`}>{c.type}</span></td>
                   <td style={{ textAlign: 'right', fontWeight: '800' }}>₺{(c.balance || 0).toLocaleString()}</td>
-                  <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
-                    <button className="btn btn-ghost"><MoreVertical size={16} /></button>
+                  <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
+                    <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === c.id ? null : c.id); }}>
+                      <MoreVertical size={16} />
+                    </button>
+                    {openMenuId === c.id && (
+                      <div style={{ position: 'absolute', right: '1rem', top: '100%', background: 'white', border: '1px solid var(--border)', borderRadius: '10px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)', zIndex: 100, minWidth: '140px', overflow: 'hidden' }}
+                        onMouseLeave={() => setOpenMenuId(null)}>
+                        <button onClick={() => { setEditCustomer({ ...c }); setOpenMenuId(null); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          ✏️ Düzenle
+                        </button>
+                        <button onClick={() => { setOpenMenuId(null); handleDelete(c.id, c.name); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--danger)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.07)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          🗑️ Sil
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -135,6 +158,39 @@ const Customers = () => {
           </tbody>
         </table>
       </div>
+
+      {/* EDIT CUSTOMER MODAL */}
+      {editCustomer && (
+        <div style={modalOverlayStyle}>
+          <div className="card" style={modalContentStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '8px' }}><User size={20} /></div>
+                <h2 style={{ fontSize: '1.25rem' }}>Cari Düzenle</h2>
+              </div>
+              <button onClick={() => setEditCustomer(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+            </div>
+            <div className="grid grid-cols-2" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <InputGroup label="Ünvan / Ad Soyad" placeholder="Tekno Lojistik Ltd." value={editCustomer.name} onChange={e => setEditCustomer({ ...editCustomer, name: e.target.value })} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-dim)' }}>Cari Türü</label>
+                <select className="input" value={editCustomer.type} onChange={e => setEditCustomer({ ...editCustomer, type: e.target.value })}>
+                  <option>Tedarikçi</option><option>Müşteri</option><option>Personel</option>
+                </select>
+              </div>
+              <InputGroup label="Vergi Dairesi" placeholder="Gebze V.D." value={editCustomer.tax_office || ''} onChange={e => setEditCustomer({ ...editCustomer, tax_office: e.target.value })} />
+              <InputGroup label="Vergi / TC No" placeholder="123456..." value={editCustomer.tax_no || ''} onChange={e => setEditCustomer({ ...editCustomer, tax_no: e.target.value })} />
+              <InputGroup label="Telefon" placeholder="+90 ..." value={editCustomer.phone || ''} onChange={e => setEditCustomer({ ...editCustomer, phone: e.target.value })} />
+              <InputGroup label="E-Posta" placeholder="info@company.com" value={editCustomer.email || ''} onChange={e => setEditCustomer({ ...editCustomer, email: e.target.value })} />
+            </div>
+            <InputGroup label="Adres" placeholder="Tam adres..." value={editCustomer.address || ''} onChange={e => setEditCustomer({ ...editCustomer, address: e.target.value })} />
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+              <button className="btn btn-ghost" onClick={() => setEditCustomer(null)}>İptal</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleUpdate}>Güncelle</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* NEW CUSTOMER MODAL */}
       {showAddModal && (
