@@ -34,6 +34,8 @@ const Invoices = ({ initialView = 'list' }) => {
     customer_id: '',
     date: new Date().toISOString().split('T')[0],
     description: '',
+    islem_turu: 'Satış Faturası',
+    fatura_tipi: 'Ticari',
     items: []
   });
 
@@ -100,7 +102,9 @@ const Invoices = ({ initialView = 'list' }) => {
         customer_id: newInvoice.customer_id,
         date: newInvoice.date,
         total_amount: total,
-        description: newInvoice.description
+        description: newInvoice.description,
+        islem_turu: newInvoice.islem_turu,
+        fatura_tipi: newInvoice.fatura_tipi,
       }])
       .select();
 
@@ -127,7 +131,7 @@ const Invoices = ({ initialView = 'list' }) => {
     else {
       setView('list');
       fetchData();
-      setNewInvoice({ invoice_no: '', customer_id: '', date: new Date().toISOString().split('T')[0], description: '', items: [] });
+      setNewInvoice({ invoice_no: '', customer_id: '', date: new Date().toISOString().split('T')[0], description: '', islem_turu: 'Satış Faturası', fatura_tipi: 'Ticari', items: [] });
     }
   };
 
@@ -294,6 +298,39 @@ const Invoices = ({ initialView = 'list' }) => {
             <div className="card" style={{ position: 'sticky', top: '2rem' }}>
               <h3 style={{ marginBottom: '1.5rem' }}>Fatura Bilgileri</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+                {/* İşlem Türü */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label className="label-sm">İşlem Türü</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {['Satış Faturası', 'Alış Faturası'].map(t => (
+                      <button key={t} type="button" onClick={() => setNewInvoice({ ...newInvoice, islem_turu: t })}
+                        style={{ flex: 1, padding: '0.55rem 0.5rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', border: '1.5px solid',
+                          background: newInvoice.islem_turu === t ? (t === 'Satış Faturası' ? 'var(--success)' : 'var(--danger)') : 'transparent',
+                          color: newInvoice.islem_turu === t ? 'white' : 'var(--text-muted)',
+                          borderColor: newInvoice.islem_turu === t ? (t === 'Satış Faturası' ? 'var(--success)' : 'var(--danger)') : 'var(--border)' }}>
+                        {t === 'Satış Faturası' ? '↑ Satış' : '↓ Alış'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fatura Tipi */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label className="label-sm">Fatura Tipi</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {['Ticari', 'Temel'].map(t => (
+                      <button key={t} type="button" onClick={() => setNewInvoice({ ...newInvoice, fatura_tipi: t })}
+                        style={{ flex: 1, padding: '0.55rem 0.5rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', border: '1.5px solid',
+                          background: newInvoice.fatura_tipi === t ? 'var(--primary)' : 'transparent',
+                          color: newInvoice.fatura_tipi === t ? 'white' : 'var(--text-muted)',
+                          borderColor: newInvoice.fatura_tipi === t ? 'var(--primary)' : 'var(--border)' }}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <InputGroup label="Fatura No" placeholder="Örn: ABC202600001" value={newInvoice.invoice_no} onChange={(e) => setNewInvoice({...newInvoice, invoice_no: e.target.value})} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label className="label-sm">Cari (Tedarikçi / Müşteri)</label>
@@ -396,8 +433,24 @@ const Invoices = ({ initialView = 'list' }) => {
                       <span style={{ fontWeight: '600' }}>{i.customers?.name || 'Bilinmeyen'}</span>
                     </div>
                   </td>
-                  <td style={{ fontWeight: '800', color: 'var(--primary)' }}>₺{i.total_amount.toLocaleString()}</td>
-                  <td><span className="badge badge-success">{i.status}</span></td>
+                  <td style={{ fontWeight: '800', color: i.islem_turu === 'Alış Faturası' ? 'var(--danger)' : 'var(--success)' }}>
+                    ₺{i.total_amount.toLocaleString()}
+                  </td>
+                  <td>
+                    {i.islem_turu && (
+                      <span style={{ fontSize: '0.72rem', fontWeight: '700', padding: '0.15rem 0.5rem', borderRadius: '20px', marginRight: '4px',
+                        background: i.islem_turu === 'Alış Faturası' ? '#fee2e2' : '#dcfce7',
+                        color: i.islem_turu === 'Alış Faturası' ? '#991b1b' : '#166534' }}>
+                        {i.islem_turu === 'Alış Faturası' ? '↓ Alış' : '↑ Satış'}
+                      </span>
+                    )}
+                    {i.fatura_tipi && (
+                      <span style={{ fontSize: '0.72rem', fontWeight: '700', padding: '0.15rem 0.5rem', borderRadius: '20px',
+                        background: '#f1f5f9', color: '#475569' }}>
+                        {i.fatura_tipi}
+                      </span>
+                    )}
+                  </td>
                   <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
                     <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === i.id ? null : i.id); }}>
                       <MoreVertical size={16} />
