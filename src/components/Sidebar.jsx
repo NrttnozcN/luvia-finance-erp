@@ -47,6 +47,7 @@ const NAV_GROUPS = [
     items: [
       { icon: <FileText size={18} />,        label: 'Defter İşlemleri',      tab: 'ledgers' },
       { icon: <TrendingUp size={18} />,      label: 'Cari Hareket Raporu',   tab: 'cari_rapor' },
+      { icon: <Wallet size={18} />,          label: 'Kasa Hareket Raporu',   tab: 'kasa_rapor' },
       { icon: <BarChart3 size={18} />,       label: 'Maliyet Raporları',     tab: 'costs' },
       { icon: <PieChart size={18} />,        label: 'Satış Raporları',       tab: 'sales' },
       { icon: <FolderOpen size={18} />,      label: 'Döküman Yönetimi',      tab: 'logs' },

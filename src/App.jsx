@@ -21,6 +21,7 @@ import BulkTransfers from './components/BulkTransfers';
 import Ledgers from './components/Ledgers';
 import Facilities from './components/Facilities';
 import CustomerMovementReport from './components/CustomerMovementReport';
+import KasaHareketRaporu from './components/KasaHareketRaporu';
 import SupportTickets from './components/SupportTickets';
 import Login from './components/Login';
 import { 
@@ -203,6 +204,7 @@ const App = () => {
       case 'ledgers': return <Ledgers />;
       case 'facilities': return <Facilities />;
       case 'cari_rapor': return <CustomerMovementReport />;
+      case 'kasa_rapor': return <KasaHareketRaporu />;
       case 'support_tickets': return <SupportTickets />;
       default: return renderDashboard();
     }
