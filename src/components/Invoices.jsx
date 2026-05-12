@@ -193,7 +193,7 @@ const Invoices = ({ initialView = 'list' }) => {
                             {/* KDV seçici */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                               <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-muted)', minWidth: '80px' }}>KDV Oranı:</span>
-                              {[0, 1, 8, 20].map(rate => (
+                              {[0, 1, 8, 10, 20].map(rate => (
                                 <button key={rate} type="button"
                                   onClick={() => { const ni = [...newInvoice.items]; ni[idx].vat_rate = rate; setNewInvoice({...newInvoice, items: ni}); }}
                                   style={{ padding: '0.25rem 0.65rem', borderRadius: '7px', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', border: '1.5px solid', background: item.vat_rate === rate ? 'var(--primary)' : 'transparent', color: item.vat_rate === rate ? 'white' : 'var(--text-muted)', borderColor: item.vat_rate === rate ? 'var(--primary)' : 'var(--border)' }}
