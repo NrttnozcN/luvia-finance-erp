@@ -75,6 +75,63 @@ const CustomerMovementReport = () => {
   const totalAlacak = movements.reduce((a, m) => a + m.alacak, 0);
   const netBakiye   = totalBorc - totalAlacak;
 
+  const handlePrint = () => {
+    const rows = movements.map(m => `
+      <tr>
+        <td>${fmtDate(m.date)}</td>
+        <td>${m.description}</td>
+        <td style="text-align:right;color:#ef4444">${m.borc > 0 ? '₺' + fmt(m.borc) : '—'}</td>
+        <td style="text-align:right;color:#10b981">${m.alacak > 0 ? '₺' + fmt(m.alacak) : '—'}</td>
+        <td style="text-align:right;font-weight:700;color:${m.balance > 0 ? '#ef4444' : '#10b981'}">
+          ₺${fmt(Math.abs(m.balance))} ${m.balance > 0 ? 'B' : m.balance < 0 ? 'A' : ''}
+        </td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+      <title>Cari Hareket Raporu - ${selectedName}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 11pt; color: #1e293b; margin: 2cm; }
+        h1 { font-size: 16pt; margin-bottom: 4px; }
+        p  { color: #64748b; font-size: 10pt; margin: 0 0 16px; }
+        .summary { display: flex; gap: 32px; margin-bottom: 20px; padding: 12px 16px; background: #f8fafc; border-radius: 8px; }
+        .summary div { font-size: 10pt; }
+        .summary strong { display: block; font-size: 13pt; margin-top: 2px; }
+        table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+        th { background: #f1f5f9; padding: 8px 10px; text-align: left; font-size: 9pt; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+        tfoot td { border-top: 2px solid #e2e8f0; font-weight: 700; background: #f8fafc; }
+        @media print { body { margin: 1cm; } }
+      </style></head><body>
+      <h1>Cari Hareket Raporu</h1>
+      <p>${selectedName} · Yazdırma tarihi: ${new Date().toLocaleDateString('tr-TR')}</p>
+      <div class="summary">
+        <div>Toplam Borç<strong style="color:#ef4444">₺${fmt(totalBorc)}</strong></div>
+        <div>Toplam Alacak<strong style="color:#10b981">₺${fmt(totalAlacak)}</strong></div>
+        <div>Net Bakiye<strong style="color:${netBakiye > 0 ? '#ef4444' : '#10b981'}">₺${fmt(Math.abs(netBakiye))} ${netBakiye > 0 ? '(Borçlu)' : '(Alacaklı)'}</strong></div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Tarih</th><th>Açıklama</th>
+          <th style="text-align:right;color:#ef4444">Borç ▲</th>
+          <th style="text-align:right;color:#10b981">Alacak ▼</th>
+          <th style="text-align:right">Bakiye</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr>
+          <td colspan="2">GENEL TOPLAM</td>
+          <td style="text-align:right;color:#ef4444">₺${fmt(totalBorc)}</td>
+          <td style="text-align:right;color:#10b981">₺${fmt(totalAlacak)}</td>
+          <td style="text-align:right">₺${fmt(Math.abs(netBakiye))} ${netBakiye > 0 ? 'B' : 'A'}</td>
+        </tr></tfoot>
+      </table>
+      <script>window.onload = () => { window.print(); }</script>
+      </body></html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+  };
+
   return (
     <div>
       <header style={{ marginBottom: '2rem' }}>
@@ -95,7 +152,7 @@ const CustomerMovementReport = () => {
           </select>
         </div>
         {selectedId && (
-          <button className="btn btn-ghost" onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button className="btn btn-ghost" onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Download size={16} /> Yazdır / PDF
           </button>
         )}

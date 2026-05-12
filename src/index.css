@@ -364,3 +364,26 @@ td {
 tr:hover td {
   background: var(--bg-main);
 }
+
+@media print {
+  .sidebar,
+  .top-bar,
+  .user-nav,
+  .btn-ghost,
+  .btn-primary { display: none !important; }
+
+  .app-container { display: block !important; }
+  .main-content  { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+  .content-area  { padding: 0 !important; }
+
+  body { background: white !important; font-size: 11pt; }
+
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+    break-inside: avoid;
+  }
+
+  /* Yazdır butonunu gizle */
+  button[onClick*="print"] { display: none !important; }
+}
