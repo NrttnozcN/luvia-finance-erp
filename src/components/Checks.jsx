@@ -32,6 +32,8 @@ const Checks = () => {
   });
   const [openMenuId, setOpenMenuId] = useState(null);
   const [editCheck, setEditCheck] = useState(null);
+  const [addErrors, setAddErrors] = useState({});
+  const [editErrors, setEditErrors] = useState({});
   const [ciroModal, setCiroModal] = useState({ show: false, check: null, toCustId: '' });
 
   const fetchData = async () => {
@@ -48,13 +50,15 @@ const Checks = () => {
   }, []);
 
   const handleSave = async () => {
-    if (!newCheck.due_date || !newCheck.amount) {
-      alert('Vade tarihi ve tutar zorunludur.');
-      return;
-    }
+    const errs = {};
+    if (!newCheck.check_no?.trim()) errs.check_no = true;
+    if (!newCheck.due_date) errs.due_date = true;
+    if (!newCheck.amount || Number(newCheck.amount) <= 0) errs.amount = true;
+    if (Object.keys(errs).length > 0) { setAddErrors(errs); return; }
+    setAddErrors({});
     const payload = {
       type: newCheck.type,
-      check_no: newCheck.check_no || null,
+      check_no: newCheck.check_no,
       due_date: newCheck.due_date,
       amount: Number(newCheck.amount),
       bank_name: newCheck.bank_name,
@@ -66,6 +70,7 @@ const Checks = () => {
     else {
       setShowAddModal(false);
       fetchData();
+      setAddErrors({});
       setNewCheck({ type: 'Müşteri Çeki', check_no: '', due_date: new Date().toISOString().split('T')[0], amount: 0, bank_name: '', customer_id: '', status: 'Portföyde' });
     }
   };
@@ -78,6 +83,12 @@ const Checks = () => {
   };
 
   const handleUpdate = async () => {
+    const errs = {};
+    if (!editCheck.check_no?.trim()) errs.check_no = true;
+    if (!editCheck.due_date) errs.due_date = true;
+    if (!editCheck.amount || Number(editCheck.amount) <= 0) errs.amount = true;
+    if (Object.keys(errs).length > 0) { setEditErrors(errs); return; }
+    setEditErrors({});
     const { id, customers: _c, ...fields } = editCheck;
     const { error } = await supabase.from('checks').update({
       ...fields,
@@ -85,7 +96,7 @@ const Checks = () => {
       customer_id: fields.customer_id || null,
     }).eq('id', id);
     if (error) alert(error.message);
-    else { setEditCheck(null); fetchData(); }
+    else { setEditCheck(null); setEditErrors({}); fetchData(); }
   };
 
   const handleCiroSubmit = async () => {
@@ -113,7 +124,7 @@ const Checks = () => {
           <h1 style={{ fontSize: '2rem' }}>Çek & Senet Yönetimi</h1>
           <p className="text-muted">Alınan ve verilen çeklerin vade takiplerini, ciro işlemlerini ve durumlarını yönetin.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+        <button className="btn btn-primary" onClick={() => { setAddErrors({}); setShowAddModal(true); }}>
           <Plus size={20} /> Yeni Çek/Senet Kaydı
         </button>
       </header>
@@ -231,10 +242,10 @@ const Checks = () => {
                   <option>Müşteri Senedi</option><option>Kendi Senedimiz</option>
                 </select>
               </div>
-              <InputGroup label="Vade Tarihi" type="date" value={editCheck.due_date} onChange={e => setEditCheck({ ...editCheck, due_date: e.target.value })} />
-              <InputGroup label="Tutar (₺)" type="number" value={editCheck.amount} onChange={e => setEditCheck({ ...editCheck, amount: e.target.value })} />
+              <InputGroup label="Vade Tarihi *" type="date" value={editCheck.due_date} onChange={e => setEditCheck({ ...editCheck, due_date: e.target.value })} error={editErrors.due_date} />
+              <InputGroup label="Tutar (₺) *" type="number" value={editCheck.amount} onChange={e => setEditCheck({ ...editCheck, amount: e.target.value })} error={editErrors.amount} />
               <InputGroup label="Banka / Şube" placeholder="Garanti BBVA" value={editCheck.bank_name || ''} onChange={e => setEditCheck({ ...editCheck, bank_name: e.target.value })} />
-              <InputGroup label="Çek No / Senet No" placeholder="Opsiyonel" value={editCheck.check_no || ''} onChange={e => setEditCheck({ ...editCheck, check_no: e.target.value })} />
+              <InputGroup label="Çek No / Senet No *" placeholder="Zorunlu alan" value={editCheck.check_no || ''} onChange={e => setEditCheck({ ...editCheck, check_no: e.target.value })} error={editErrors.check_no} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
               <label className="label-sm">Keşideci / Cari</label>
@@ -312,10 +323,10 @@ const Checks = () => {
                   <option>Kendi Senedimiz</option>
                 </select>
               </div>
-              <InputGroup label="Vade Tarihi" type="date" value={newCheck.due_date} onChange={(e) => setNewCheck({...newCheck, due_date: e.target.value})} />
-              <InputGroup label="Tutar (₺)" type="number" value={newCheck.amount} onChange={(e) => setNewCheck({...newCheck, amount: e.target.value})} />
+              <InputGroup label="Vade Tarihi *" type="date" value={newCheck.due_date} onChange={(e) => setNewCheck({...newCheck, due_date: e.target.value})} error={addErrors.due_date} />
+              <InputGroup label="Tutar (₺) *" type="number" value={newCheck.amount} onChange={(e) => setNewCheck({...newCheck, amount: e.target.value})} error={addErrors.amount} />
               <InputGroup label="Banka / Şube" placeholder="Örn: Garanti BBVA" value={newCheck.bank_name} onChange={(e) => setNewCheck({...newCheck, bank_name: e.target.value})} />
-              <InputGroup label="Çek No / Senet No" placeholder="Opsiyonel" value={newCheck.check_no} onChange={(e) => setNewCheck({...newCheck, check_no: e.target.value})} />
+              <InputGroup label="Çek No / Senet No *" placeholder="Zorunlu alan" value={newCheck.check_no} onChange={(e) => setNewCheck({...newCheck, check_no: e.target.value})} error={addErrors.check_no} />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
@@ -337,10 +348,11 @@ const Checks = () => {
   );
 };
 
-const InputGroup = ({ label, placeholder, type, value, onChange }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+const InputGroup = ({ label, placeholder, type, value, onChange, error }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
     <label className="label-sm">{label}</label>
-    <input type={type || 'text'} className="input" placeholder={placeholder} value={value} onChange={onChange} />
+    <input type={type || 'text'} className="input" style={error ? { borderColor: 'var(--danger)' } : {}} placeholder={placeholder} value={value} onChange={onChange} />
+    {error && <p style={{ color: 'var(--danger)', fontSize: '0.72rem', fontWeight: '600', margin: 0 }}>Bu alanın girilmesi zorunludur.</p>}
   </div>
 );
 

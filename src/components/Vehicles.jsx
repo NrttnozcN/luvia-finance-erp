@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Truck, Plus, MoreVertical, ChevronRight, AlertCircle,
-  CheckCircle2, Clock, X, Gauge, Calendar, ShieldCheck,
-  ArrowLeft, Wrench, FileText, Trash2, Shield
+  Truck, Plus, MoreVertical, CheckCircle2, ShieldCheck,
+  ArrowLeft, Trash2, X, Gauge, Building2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -15,37 +14,55 @@ const daysUntil = (dateStr) => {
   return Math.ceil((new Date(dateStr) - new Date()) / 86400000);
 };
 
+const EMPTY_VEHICLE = {
+  plate: '', brand: '', model: '', model_year: '', vin_no: '',
+  driver_name: '', vehicle_type: 'Çekici', current_km: 0,
+  fuel_type: 'Dizel', avg_fuel_consumption: '', ownership: 'Şirkete Ait',
+  condition: 'İkinci El', facility_id: '',
+};
+
+const validateVehicle = (v) => {
+  const e = {};
+  if (!v.plate?.trim()) e.plate = true;
+  if (!v.brand?.trim()) e.brand = true;
+  if (!v.model?.trim()) e.model = true;
+  return e;
+};
+
 const Vehicles = () => {
   const [view, setView] = useState('list');
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [activeTab, setActiveTab] = useState('inspections');
 
-  // List
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState([]);
+  const [facilities, setFacilities] = useState([]);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [editRecord, setEditRecord] = useState(null);
+  const [editErr, setEditErr] = useState({});
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newVehicle, setNewVehicle] = useState({ plate: '', model: '', model_year: '', vin_no: '', driver_name: '', vehicle_type: 'Çekici', current_km: 0 });
+  const [newVehicle, setNewVehicle] = useState({ ...EMPTY_VEHICLE });
+  const [addErr, setAddErr] = useState({});
 
-  // Detail
   const [inspections, setInspections] = useState([]);
   const [maintenances, setMaintenances] = useState([]);
+  const [insurances, setInsurances] = useState([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showInspModal, setShowInspModal] = useState(false);
   const [showMaintModal, setShowMaintModal] = useState(false);
+  const [showInsurModal, setShowInsurModal] = useState(false);
   const [newInsp, setNewInsp] = useState({ inspection_date: today(), expiry_date: '', type: 'Muayene', result: 'Geçti', cost: 0, notes: '' });
   const [newMaint, setNewMaint] = useState({ maintenance_date: today(), maintenance_type: 'Periyodik Bakım', km_at_maintenance: 0, next_maintenance_km: '', cost: 0, workshop: '', notes: '' });
-
-  // Sigorta
-  const [insurances, setInsurances] = useState([]);
-  const [showInsurModal, setShowInsurModal] = useState(false);
   const [newInsur, setNewInsur] = useState({ insurance_type: 'Kasko', company: '', policy_no: '', start_date: today(), expiry_date: '', cost: 0, notes: '' });
 
   const fetchVehicles = async () => {
     setLoading(true);
-    const { data } = await supabase.from('vehicles').select('*').order('created_at', { ascending: false });
-    setVehicles(data || []);
+    const [{ data: vData }, { data: fData }] = await Promise.all([
+      supabase.from('vehicles').select('*, facilities(name)').order('created_at', { ascending: false }),
+      supabase.from('facilities').select('id, name').order('name'),
+    ]);
+    setVehicles(vData || []);
+    setFacilities(fData || []);
     setLoading(false);
   };
 
@@ -72,16 +89,24 @@ const Vehicles = () => {
   };
 
   const handleSave = async () => {
-    const { error } = await supabase.from('vehicles').insert([newVehicle]);
+    const errs = validateVehicle(newVehicle);
+    if (Object.keys(errs).length > 0) { setAddErr(errs); return; }
+    setAddErr({});
+    const payload = { ...newVehicle, facility_id: newVehicle.facility_id || null, avg_fuel_consumption: newVehicle.avg_fuel_consumption !== '' ? Number(newVehicle.avg_fuel_consumption) : null };
+    const { error } = await supabase.from('vehicles').insert([payload]);
     if (error) { alert(error.message); return; }
     setShowAddModal(false);
+    setNewVehicle({ ...EMPTY_VEHICLE });
     fetchVehicles();
-    setNewVehicle({ plate: '', model: '', model_year: '', vin_no: '', driver_name: '', vehicle_type: 'Çekici', current_km: 0 });
   };
 
   const handleUpdate = async () => {
-    const { id, ...fields } = editRecord;
-    const { error } = await supabase.from('vehicles').update(fields).eq('id', id);
+    const errs = validateVehicle(editRecord);
+    if (Object.keys(errs).length > 0) { setEditErr(errs); return; }
+    setEditErr({});
+    const { id, facilities: _f, ...fields } = editRecord;
+    const payload = { ...fields, facility_id: fields.facility_id || null, avg_fuel_consumption: fields.avg_fuel_consumption !== '' ? Number(fields.avg_fuel_consumption) : null };
+    const { error } = await supabase.from('vehicles').update(payload).eq('id', id);
     if (error) { alert(error.message); return; }
     setEditRecord(null);
     fetchVehicles();
@@ -115,18 +140,6 @@ const Vehicles = () => {
     fetchDetail(selectedVehicle.id);
   };
 
-  const handleDeleteInsp = async (id) => {
-    if (!window.confirm('Bu muayene kaydı silinecek.')) return;
-    await supabase.from('vehicle_inspections').delete().eq('id', id);
-    fetchDetail(selectedVehicle.id);
-  };
-
-  const handleDeleteMaint = async (id) => {
-    if (!window.confirm('Bu bakım kaydı silinecek.')) return;
-    await supabase.from('vehicle_maintenances').delete().eq('id', id);
-    fetchDetail(selectedVehicle.id);
-  };
-
   const handleSaveInsur = async () => {
     if (!newInsur.expiry_date) { alert('Bitiş tarihi zorunludur.'); return; }
     const { error } = await supabase.from('vehicle_insurances').insert([{
@@ -136,6 +149,18 @@ const Vehicles = () => {
     if (error) { alert(error.message); return; }
     setShowInsurModal(false);
     setNewInsur({ insurance_type: 'Kasko', company: '', policy_no: '', start_date: today(), expiry_date: '', cost: 0, notes: '' });
+    fetchDetail(selectedVehicle.id);
+  };
+
+  const handleDeleteInsp = async (id) => {
+    if (!window.confirm('Bu muayene kaydı silinecek.')) return;
+    await supabase.from('vehicle_inspections').delete().eq('id', id);
+    fetchDetail(selectedVehicle.id);
+  };
+
+  const handleDeleteMaint = async (id) => {
+    if (!window.confirm('Bu bakım kaydı silinecek.')) return;
+    await supabase.from('vehicle_maintenances').delete().eq('id', id);
     fetchDetail(selectedVehicle.id);
   };
 
@@ -158,12 +183,18 @@ const Vehicles = () => {
           <button className="btn btn-ghost" onClick={() => setView('list')}><ArrowLeft size={18} /> Geri</button>
           <div>
             <h1 style={{ fontSize: '1.75rem', fontWeight: '800' }}>{selectedVehicle.plate}</h1>
-            <p className="text-muted" style={{ fontSize: '0.85rem' }}>{selectedVehicle.model} · {selectedVehicle.model_year} · {selectedVehicle.vehicle_type}</p>
+            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+              {selectedVehicle.brand} {selectedVehicle.model} · {selectedVehicle.model_year} · {selectedVehicle.vehicle_type}
+            </p>
           </div>
         </div>
 
-        {/* Araç özet kartları */}
-        <div className="grid grid-cols-4" style={{ marginBottom: '2rem' }}>
+        {/* Araç özet kartları — 2 satır × 4 */}
+        <div className="grid grid-cols-4" style={{ marginBottom: '1rem' }}>
+          <div className="card">
+            <p className="text-muted" style={{ fontSize: '0.8rem' }}>Tesis</p>
+            <p style={{ fontWeight: '700', marginTop: '4px' }}>{selectedVehicle.facilities?.name || '—'}</p>
+          </div>
           <div className="card">
             <p className="text-muted" style={{ fontSize: '0.8rem' }}>Sürücü</p>
             <p style={{ fontWeight: '700', marginTop: '4px' }}>{selectedVehicle.driver_name || '—'}</p>
@@ -180,6 +211,20 @@ const Vehicles = () => {
                 ({daysLeft < 0 ? `${Math.abs(daysLeft)} gün geçti` : `${daysLeft} gün kaldı`})
               </span>}
             </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-4" style={{ marginBottom: '2rem' }}>
+          <div className="card">
+            <p className="text-muted" style={{ fontSize: '0.8rem' }}>Yakıt Tipi</p>
+            <p style={{ fontWeight: '700', marginTop: '4px' }}>{selectedVehicle.fuel_type || '—'}</p>
+          </div>
+          <div className="card">
+            <p className="text-muted" style={{ fontSize: '0.8rem' }}>Araç Sahipliği</p>
+            <p style={{ fontWeight: '700', marginTop: '4px' }}>{selectedVehicle.ownership || '—'}</p>
+          </div>
+          <div className="card">
+            <p className="text-muted" style={{ fontSize: '0.8rem' }}>Ort. Yakıt Tüketimi</p>
+            <p style={{ fontWeight: '700', marginTop: '4px' }}>{selectedVehicle.avg_fuel_consumption ? `${selectedVehicle.avg_fuel_consumption} L/100km` : '—'}</p>
           </div>
           <div className="card">
             <p className="text-muted" style={{ fontSize: '0.8rem' }}>Sigorta Bitiş</p>
@@ -214,7 +259,7 @@ const Vehicles = () => {
         {activeTab === 'inspections' && (
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.1rem' }}>Muayene / Sigorta / Egzoz Kayıtları</h3>
+              <h3 style={{ fontSize: '1.1rem' }}>Muayene / Egzoz Kayıtları</h3>
               <button className="btn btn-primary" onClick={() => setShowInspModal(true)}><Plus size={16} /> Yeni Ekle</button>
             </div>
             {loadingDetail ? <p className="text-muted" style={{ textAlign: 'center', padding: '2rem' }}>Yükleniyor...</p>
@@ -365,14 +410,14 @@ const Vehicles = () => {
           <div style={overlay}>
             <div className="card" style={modal}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.15rem' }}>🔍 Muayene / Sigorta Kaydı Ekle</h2>
+                <h2 style={{ fontSize: '1.15rem' }}>🔍 Muayene / Egzoz Kaydı Ekle</h2>
                 <button onClick={() => setShowInspModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={22} /></button>
               </div>
               <div className="grid grid-cols-2" style={{ gap: '1.25rem', marginBottom: '1.25rem' }}>
                 <div style={col}>
                   <label className="label-sm">Kayıt Türü</label>
                   <select className="input" value={newInsp.type} onChange={e => setNewInsp({ ...newInsp, type: e.target.value })}>
-                    <option>Muayene</option><option>Trafik Sigortası</option><option>Kasko</option><option>Egzoz Muayenesi</option>
+                    <option>Muayene</option><option>Egzoz Muayenesi</option>
                   </select>
                 </div>
                 <div style={col}>
@@ -466,7 +511,7 @@ const Vehicles = () => {
           <h1 style={{ fontSize: '2rem' }}>Filo & Araç Yönetimi</h1>
           <p className="text-muted">Araç satırına tıklayarak muayene ve bakım kayıtlarına ulaşın.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+        <button className="btn btn-primary" onClick={() => { setNewVehicle({ ...EMPTY_VEHICLE }); setAddErr({}); setShowAddModal(true); }}>
           <Plus size={20} /> Yeni Araç Tanımla
         </button>
       </header>
@@ -475,26 +520,27 @@ const Vehicles = () => {
         <VehicleStat title="Toplam Araç" value={vehicles.length} sub="Aktif Filo" icon={<Truck size={20} />} color="var(--primary)" />
         <VehicleStat title="Araç Tipi" value={[...new Set(vehicles.map(v => v.vehicle_type))].length} sub="Farklı tip" icon={<Gauge size={20} />} color="var(--warning)" />
         <VehicleStat title="Sürücü Atanan" value={vehicles.filter(v => v.driver_name).length} sub="Araç" icon={<CheckCircle2 size={20} />} color="var(--success)" />
-        <VehicleStat title="Muayene / Bakım" icon={<ShieldCheck size={20} />} value="→" sub="Araca tıkla" color="var(--primary)" />
+        <VehicleStat title="Tesis Sayısı" value={[...new Set(vehicles.filter(v => v.facility_id).map(v => v.facility_id))].length} sub="Bağlı tesis" icon={<Building2 size={20} />} color="var(--primary)" />
       </div>
 
       <div className="card" style={{ padding: '0' }}>
         <table style={{ width: '100%' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              <th style={{ padding: '1.25rem' }}>Plaka</th>
-              <th>Marka / Model</th>
-              <th>Sürücü</th>
-              <th>Kilometre</th>
-              <th>Durum</th>
-              <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>İşlem</th>
+              <th style={{ padding: '1.25rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Plaka / Durum</th>
+              <th style={{ padding: '1.25rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Marka / Model</th>
+              <th style={{ padding: '1.25rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Tesis</th>
+              <th style={{ padding: '1.25rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Sürücü</th>
+              <th style={{ padding: '1.25rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Kilometre</th>
+              <th style={{ padding: '1.25rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Yakıt</th>
+              <th style={{ padding: '1.25rem', textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700', paddingRight: '1.25rem' }}>İşlem</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" style={{ textAlign: 'center', padding: '3rem' }}>Yükleniyor...</td></tr>
+              <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem' }}>Yükleniyor...</td></tr>
             ) : vehicles.length === 0 ? (
-              <tr><td colSpan="6" style={{ textAlign: 'center', padding: '3rem' }}>Henüz araç tanımlanmamış.</td></tr>
+              <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem' }}>Henüz araç tanımlanmamış.</td></tr>
             ) : vehicles.map(v => (
               <tr key={v.id} style={{ borderBottom: '1px solid var(--bg-main)', cursor: 'pointer' }}
                 onClick={() => openDetail(v)}
@@ -503,16 +549,30 @@ const Vehicles = () => {
                 <td style={{ padding: '1.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{ background: 'var(--primary-light)', padding: '0.5rem', borderRadius: '8px' }}><Truck size={18} color="var(--primary)" /></div>
-                    <span style={{ fontWeight: '700' }}>{v.plate}</span>
+                    <div>
+                      <p style={{ fontWeight: '700' }}>{v.plate}</p>
+                      {v.condition && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: '700', padding: '0.1rem 0.4rem', borderRadius: '8px',
+                          background: v.condition === 'Sıfır' ? '#dcfce7' : '#f1f5f9',
+                          color: v.condition === 'Sıfır' ? '#166534' : '#64748b' }}>
+                          {v.condition}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </td>
-                <td>
-                  <p style={{ fontWeight: '600', fontSize: '0.9rem' }}>{v.model}</p>
-                  <p className="text-muted" style={{ fontSize: '0.75rem' }}>{v.model_year} | {v.vehicle_type}</p>
+                <td style={{ padding: '1.25rem' }}>
+                  <p style={{ fontWeight: '600', fontSize: '0.9rem' }}>{v.brand} {v.model}</p>
+                  <p className="text-muted" style={{ fontSize: '0.75rem' }}>{v.model_year} · {v.vehicle_type}</p>
                 </td>
-                <td className="text-dim" style={{ fontSize: '0.9rem' }}>{v.driver_name || 'Atanmamış'}</td>
-                <td style={{ fontWeight: '700' }}>{fmt(v.current_km)} km</td>
-                <td><span className="badge badge-success">{v.status || 'Aktif'}</span></td>
+                <td style={{ padding: '1.25rem' }}>
+                  {v.facilities?.name
+                    ? <span style={{ fontSize: '0.78rem', fontWeight: '700', padding: '0.2rem 0.6rem', borderRadius: '20px', background: 'rgba(255,107,0,0.1)', color: 'var(--primary)' }}>{v.facilities.name}</span>
+                    : <span style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>—</span>}
+                </td>
+                <td style={{ padding: '1.25rem', color: 'var(--text-dim)', fontSize: '0.9rem' }}>{v.driver_name || 'Atanmamış'}</td>
+                <td style={{ padding: '1.25rem', fontWeight: '700' }}>{fmt(v.current_km)} km</td>
+                <td style={{ padding: '1.25rem', fontSize: '0.85rem', color: 'var(--text-dim)' }}>{v.fuel_type || '—'}</td>
                 <td style={{ textAlign: 'right', paddingRight: '1.25rem', position: 'relative' }}>
                   <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === v.id ? null : v.id); }}>
                     <MoreVertical size={16} />
@@ -524,7 +584,7 @@ const Vehicles = () => {
                         style={menuBtn} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                         🔍 Muayene / Bakım
                       </button>
-                      <button onClick={e => { e.stopPropagation(); setEditRecord({ ...v }); setOpenMenuId(null); }}
+                      <button onClick={e => { e.stopPropagation(); setEditRecord({ ...v }); setEditErr({}); setOpenMenuId(null); }}
                         style={menuBtn} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                         ✏️ Düzenle
                       </button>
@@ -541,59 +601,137 @@ const Vehicles = () => {
         </table>
       </div>
 
-      {/* EDIT MODAL */}
-      {editRecord && (
+      {/* ADD MODAL */}
+      {showAddModal && (
         <div style={overlay}>
-          <div className="card" style={modal}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.25rem' }}>Aracı Düzenle</h2>
-              <button onClick={() => setEditRecord(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+          <div className="card" style={{ ...modal, maxWidth: '700px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem' }}>
+              <h2 style={{ fontSize: '1.25rem' }}>Yeni Araç Tanımla</h2>
+              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
             </div>
-            <div className="grid grid-cols-2" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
-              <IG label="Plaka" value={editRecord.plate || ''} onChange={e => setEditRecord({ ...editRecord, plate: e.target.value.toUpperCase() })} />
-              <IG label="Marka / Model" value={editRecord.model || ''} onChange={e => setEditRecord({ ...editRecord, model: e.target.value })} />
-              <IG label="Model Yılı" value={editRecord.model_year || ''} onChange={e => setEditRecord({ ...editRecord, model_year: e.target.value })} />
-              <IG label="Şasi No" value={editRecord.vin_no || ''} onChange={e => setEditRecord({ ...editRecord, vin_no: e.target.value })} />
-              <IG label="Sürücü" value={editRecord.driver_name || ''} onChange={e => setEditRecord({ ...editRecord, driver_name: e.target.value })} />
+
+            <SectionLabel>Temel Bilgiler</SectionLabel>
+            <div className="grid grid-cols-3" style={{ gap: '1rem', marginBottom: '1.25rem' }}>
+              <IG label="Plaka *" placeholder="34 LUV 06" value={newVehicle.plate} onChange={e => setNewVehicle({ ...newVehicle, plate: e.target.value.toUpperCase() })} error={addErr.plate} />
+              <IG label="Araç Marka *" placeholder="Mercedes, Ford..." value={newVehicle.brand} onChange={e => setNewVehicle({ ...newVehicle, brand: e.target.value })} error={addErr.brand} />
+              <IG label="Araç Model *" placeholder="Actros, Transit..." value={newVehicle.model} onChange={e => setNewVehicle({ ...newVehicle, model: e.target.value })} error={addErr.model} />
+              <IG label="Model Yılı" placeholder="2023" value={newVehicle.model_year} onChange={e => setNewVehicle({ ...newVehicle, model_year: e.target.value })} />
+              <IG label="Şasi No (VIN)" placeholder="Opsiyonel" value={newVehicle.vin_no} onChange={e => setNewVehicle({ ...newVehicle, vin_no: e.target.value })} />
+              <IG label="Sürücü" placeholder="Ad Soyad" value={newVehicle.driver_name} onChange={e => setNewVehicle({ ...newVehicle, driver_name: e.target.value })} />
+            </div>
+
+            <SectionLabel>Teknik Detaylar</SectionLabel>
+            <div className="grid grid-cols-3" style={{ gap: '1rem', marginBottom: '1.25rem' }}>
               <div style={col}>
                 <label className="label-sm">Araç Tipi</label>
-                <select className="input" value={editRecord.vehicle_type} onChange={e => setEditRecord({ ...editRecord, vehicle_type: e.target.value })}>
-                  <option>Çekici</option><option>Dorse</option><option>Kamyonet</option><option>Binek</option>
+                <select className="input" value={newVehicle.vehicle_type} onChange={e => setNewVehicle({ ...newVehicle, vehicle_type: e.target.value })}>
+                  <option>Çekici</option><option>Dorse</option><option>Kamyonet</option><option>Kamyon</option><option>Minibüs</option><option>Binek</option>
+                </select>
+              </div>
+              <div style={col}>
+                <label className="label-sm">Yakıt Tipi</label>
+                <select className="input" value={newVehicle.fuel_type} onChange={e => setNewVehicle({ ...newVehicle, fuel_type: e.target.value })}>
+                  <option>Dizel</option><option>Benzin</option><option>Elektrik</option><option>Hibrit</option><option>Benzin/LPG</option>
+                </select>
+              </div>
+              <div style={col}>
+                <label className="label-sm">Araç Durumu</label>
+                <select className="input" value={newVehicle.condition} onChange={e => setNewVehicle({ ...newVehicle, condition: e.target.value })}>
+                  <option>İkinci El</option><option>Sıfır</option>
+                </select>
+              </div>
+              <IG label="Ort. Yakıt Tüketimi (L/100km)" type="number" placeholder="Opsiyonel" value={newVehicle.avg_fuel_consumption} onChange={e => setNewVehicle({ ...newVehicle, avg_fuel_consumption: e.target.value })} />
+              <IG label="Güncel Kilometre" type="number" value={newVehicle.current_km} onChange={e => setNewVehicle({ ...newVehicle, current_km: e.target.value })} />
+            </div>
+
+            <SectionLabel>Operasyonel Bilgiler</SectionLabel>
+            <div className="grid grid-cols-2" style={{ gap: '1rem', marginBottom: '1.75rem' }}>
+              <div style={col}>
+                <label className="label-sm">Araç Sahipliği</label>
+                <select className="input" value={newVehicle.ownership} onChange={e => setNewVehicle({ ...newVehicle, ownership: e.target.value })}>
+                  <option>Şirkete Ait</option><option>Kiralık</option><option>Finansal Kiralama</option><option>Operasyonel Kiralama</option>
+                </select>
+              </div>
+              <div style={col}>
+                <label className="label-sm">Tesis</label>
+                <select className="input" value={newVehicle.facility_id} onChange={e => setNewVehicle({ ...newVehicle, facility_id: e.target.value })}>
+                  <option value="">— Seçiniz —</option>
+                  {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost" onClick={() => setEditRecord(null)}>İptal</button>
-              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleUpdate}>Güncelle</button>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn btn-ghost" onClick={() => setShowAddModal(false)} style={{ flex: 1 }}>İptal</button>
+              <button className="btn btn-primary" onClick={handleSave} style={{ flex: 2 }}>Aracı Kaydet</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ADD MODAL */}
-      {showAddModal && (
+      {/* EDIT MODAL */}
+      {editRecord && (
         <div style={overlay}>
-          <div className="card" style={modal}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.25rem' }}>Yeni Araç Tanımla</h2>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+          <div className="card" style={{ ...modal, maxWidth: '700px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem' }}>
+              <h2 style={{ fontSize: '1.25rem' }}>Aracı Düzenle</h2>
+              <button onClick={() => setEditRecord(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
             </div>
-            <div className="grid grid-cols-2" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
-              <IG label="Plaka" placeholder="34 LUV ..." value={newVehicle.plate} onChange={e => setNewVehicle({ ...newVehicle, plate: e.target.value.toUpperCase() })} />
-              <IG label="Marka / Model" placeholder="Mercedes Actros" value={newVehicle.model} onChange={e => setNewVehicle({ ...newVehicle, model: e.target.value })} />
-              <IG label="Model Yılı" placeholder="2023" value={newVehicle.model_year} onChange={e => setNewVehicle({ ...newVehicle, model_year: e.target.value })} />
-              <IG label="Şasi No" placeholder="VIN..." value={newVehicle.vin_no} onChange={e => setNewVehicle({ ...newVehicle, vin_no: e.target.value })} />
-              <IG label="Sürücü" placeholder="Ad Soyad" value={newVehicle.driver_name} onChange={e => setNewVehicle({ ...newVehicle, driver_name: e.target.value })} />
+
+            <SectionLabel>Temel Bilgiler</SectionLabel>
+            <div className="grid grid-cols-3" style={{ gap: '1rem', marginBottom: '1.25rem' }}>
+              <IG label="Plaka *" value={editRecord.plate || ''} onChange={e => setEditRecord({ ...editRecord, plate: e.target.value.toUpperCase() })} error={editErr.plate} />
+              <IG label="Araç Marka *" placeholder="Mercedes, Ford..." value={editRecord.brand || ''} onChange={e => setEditRecord({ ...editRecord, brand: e.target.value })} error={editErr.brand} />
+              <IG label="Araç Model *" placeholder="Actros, Transit..." value={editRecord.model || ''} onChange={e => setEditRecord({ ...editRecord, model: e.target.value })} error={editErr.model} />
+              <IG label="Model Yılı" value={editRecord.model_year || ''} onChange={e => setEditRecord({ ...editRecord, model_year: e.target.value })} />
+              <IG label="Şasi No (VIN)" value={editRecord.vin_no || ''} onChange={e => setEditRecord({ ...editRecord, vin_no: e.target.value })} />
+              <IG label="Sürücü" value={editRecord.driver_name || ''} onChange={e => setEditRecord({ ...editRecord, driver_name: e.target.value })} />
+            </div>
+
+            <SectionLabel>Teknik Detaylar</SectionLabel>
+            <div className="grid grid-cols-3" style={{ gap: '1rem', marginBottom: '1.25rem' }}>
               <div style={col}>
                 <label className="label-sm">Araç Tipi</label>
-                <select className="input" value={newVehicle.vehicle_type} onChange={e => setNewVehicle({ ...newVehicle, vehicle_type: e.target.value })}>
-                  <option>Çekici</option><option>Dorse</option><option>Kamyonet</option><option>Binek</option>
+                <select className="input" value={editRecord.vehicle_type || 'Çekici'} onChange={e => setEditRecord({ ...editRecord, vehicle_type: e.target.value })}>
+                  <option>Çekici</option><option>Dorse</option><option>Kamyonet</option><option>Kamyon</option><option>Minibüs</option><option>Binek</option>
+                </select>
+              </div>
+              <div style={col}>
+                <label className="label-sm">Yakıt Tipi</label>
+                <select className="input" value={editRecord.fuel_type || 'Dizel'} onChange={e => setEditRecord({ ...editRecord, fuel_type: e.target.value })}>
+                  <option>Dizel</option><option>Benzin</option><option>Elektrik</option><option>Hibrit</option><option>Benzin/LPG</option>
+                </select>
+              </div>
+              <div style={col}>
+                <label className="label-sm">Araç Durumu</label>
+                <select className="input" value={editRecord.condition || 'İkinci El'} onChange={e => setEditRecord({ ...editRecord, condition: e.target.value })}>
+                  <option>İkinci El</option><option>Sıfır</option>
+                </select>
+              </div>
+              <IG label="Ort. Yakıt Tüketimi (L/100km)" type="number" placeholder="Opsiyonel" value={editRecord.avg_fuel_consumption || ''} onChange={e => setEditRecord({ ...editRecord, avg_fuel_consumption: e.target.value })} />
+              <IG label="Güncel Kilometre" type="number" value={editRecord.current_km || 0} onChange={e => setEditRecord({ ...editRecord, current_km: e.target.value })} />
+            </div>
+
+            <SectionLabel>Operasyonel Bilgiler</SectionLabel>
+            <div className="grid grid-cols-2" style={{ gap: '1rem', marginBottom: '1.75rem' }}>
+              <div style={col}>
+                <label className="label-sm">Araç Sahipliği</label>
+                <select className="input" value={editRecord.ownership || 'Şirkete Ait'} onChange={e => setEditRecord({ ...editRecord, ownership: e.target.value })}>
+                  <option>Şirkete Ait</option><option>Kiralık</option><option>Finansal Kiralama</option><option>Operasyonel Kiralama</option>
+                </select>
+              </div>
+              <div style={col}>
+                <label className="label-sm">Tesis</label>
+                <select className="input" value={editRecord.facility_id || ''} onChange={e => setEditRecord({ ...editRecord, facility_id: e.target.value })}>
+                  <option value="">— Seçiniz —</option>
+                  {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost" onClick={() => setShowAddModal(false)}>İptal</button>
-              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Aracı Kaydet</button>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn btn-ghost" onClick={() => setEditRecord(null)} style={{ flex: 1 }}>İptal</button>
+              <button className="btn btn-primary" onClick={handleUpdate} style={{ flex: 2 }}>Güncelle</button>
             </div>
           </div>
         </div>
@@ -611,14 +749,26 @@ const VehicleStat = ({ title, value, sub, icon, color }) => (
   </div>
 );
 
-const IG = ({ label, placeholder, type, value, onChange }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+const IG = ({ label, placeholder, type, value, onChange, error }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
     <label className="label-sm">{label}</label>
-    <input type={type || 'text'} className="input" placeholder={placeholder} value={value} onChange={onChange} />
+    <input
+      type={type || 'text'}
+      className="input"
+      style={error ? { borderColor: 'var(--danger)' } : {}}
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+    />
+    {error && <p style={{ color: 'var(--danger)', fontSize: '0.72rem', fontWeight: '600', margin: 0 }}>Bu alanın girilmesi zorunludur.</p>}
   </div>
 );
 
-const col = { display: 'flex', flexDirection: 'column', gap: '0.5rem' };
+const SectionLabel = ({ children }) => (
+  <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem', marginTop: '0.25rem' }}>{children}</p>
+);
+
+const col = { display: 'flex', flexDirection: 'column', gap: '0.35rem' };
 const menuBtn = { display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', padding: '0.7rem 1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text)' };
 const overlay = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' };
 const modal = { width: '100%', maxWidth: '650px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' };
