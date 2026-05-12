@@ -22,6 +22,7 @@ const Finance = () => {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [kasalar, setKasalar] = useState([]);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [editRecord, setEditRecord] = useState(null);
   const [newTransaction, setNewTransaction] = useState({
@@ -37,8 +38,10 @@ const Finance = () => {
     setLoading(true);
     const { data: trans } = await supabase.from('finance_transactions').select('*, customers(name)').order('created_at', { ascending: false });
     const { data: custs } = await supabase.from('customers').select('*');
+    const { data: kslar } = await supabase.from('kasalar').select('*').order('name');
     setTransactions(trans || []);
     setCustomers(custs || []);
+    setKasalar(kslar || []);
     setLoading(false);
   };
 
@@ -192,7 +195,16 @@ const Finance = () => {
                   <option>Kredi Kartı</option>
                 </select>
               </div>
-              <InputGroup label="Hesap Adı" placeholder="Merkez Kasa, Garanti Bankası vb." value={editRecord.account_name || ''} onChange={(e) => setEditRecord({...editRecord, account_name: e.target.value})} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label className="label-sm">Hesap Adı</label>
+                <select className="input" value={editRecord.account_name || ''} onChange={e => {
+                  const kasa = kasalar.find(k => k.name === e.target.value);
+                  setEditRecord({ ...editRecord, account_name: e.target.value, account_type: kasa?.type || editRecord.account_type });
+                }}>
+                  <option value="">Seçiniz...</option>
+                  {kasalar.map(k => <option key={k.id} value={k.name}>{k.name} ({k.type})</option>)}
+                </select>
+              </div>
               <InputGroup label="Tutar (₺)" type="number" value={editRecord.amount} onChange={(e) => setEditRecord({...editRecord, amount: e.target.value})} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
@@ -239,7 +251,16 @@ const Finance = () => {
                   <option>Kredi Kartı</option>
                 </select>
               </div>
-              <InputGroup label="Hesap Adı" placeholder="Merkez Kasa, Garanti Bankası vb." value={newTransaction.account_name} onChange={(e) => setNewTransaction({...newTransaction, account_name: e.target.value})} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label className="label-sm">Hesap Adı</label>
+                <select className="input" value={newTransaction.account_name} onChange={e => {
+                  const kasa = kasalar.find(k => k.name === e.target.value);
+                  setNewTransaction({ ...newTransaction, account_name: e.target.value, account_type: kasa?.type || newTransaction.account_type });
+                }}>
+                  <option value="">Seçiniz...</option>
+                  {kasalar.map(k => <option key={k.id} value={k.name}>{k.name} ({k.type})</option>)}
+                </select>
+              </div>
               <InputGroup label="Tutar (₺)" type="number" value={newTransaction.amount} onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})} />
             </div>
 
