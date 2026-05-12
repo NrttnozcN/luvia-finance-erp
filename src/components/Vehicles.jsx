@@ -44,6 +44,10 @@ const Vehicles = () => {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [editRecord, setEditRecord] = useState(null);
   const [editErr, setEditErr] = useState({});
+  const [filterFacility, setFilterFacility] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterBrand, setFilterBrand] = useState('');
+  const [filterModel, setFilterModel] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newVehicle, setNewVehicle] = useState({ ...EMPTY_VEHICLE });
   const [addErr, setAddErr] = useState({});
@@ -58,6 +62,29 @@ const Vehicles = () => {
   const [newInsp, setNewInsp] = useState({ inspection_date: today(), expiry_date: '', type: 'Muayene', result: 'Geçti', cost: 0, notes: '' });
   const [newMaint, setNewMaint] = useState({ maintenance_date: today(), maintenance_type: 'Periyodik Bakım', km_at_maintenance: 0, next_maintenance_km: '', cost: 0, workshop: '', notes: '' });
   const [newInsur, setNewInsur] = useState({ insurance_type: 'Kasko', company: '', policy_no: '', start_date: today(), expiry_date: '', cost: 0, notes: '' });
+
+  const filteredVehicles = vehicles.filter(v =>
+    (!filterFacility || v.facility_id === filterFacility) &&
+    (!filterType || v.vehicle_type === filterType) &&
+    (!filterBrand || v.brand === filterBrand) &&
+    (!filterModel || (v.model || '').toLowerCase().includes(filterModel.toLowerCase()))
+  );
+
+  const exportCSV = () => {
+    const headers = ['Plaka', 'Marka', 'Model', 'Yıl', 'Araç Tipi', 'Yakıt', 'Tesis', 'Sürücü', 'Kilometre', 'Sahiplik', 'Durum'];
+    const rows = filteredVehicles.map(v => [
+      v.plate, v.brand, v.model, v.model_year || '', v.vehicle_type || '', v.fuel_type || '',
+      v.facilities?.name || '', v.driver_name || '', v.current_km || 0, v.ownership || '', v.condition || ''
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `arac-listesi-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const fetchVehicles = async () => {
     setLoading(true);
@@ -527,6 +554,58 @@ const Vehicles = () => {
         <VehicleStat title="Tesis Sayısı" value={[...new Set(vehicles.filter(v => v.facility_id).map(v => v.facility_id))].length} sub="Bağlı tesis" icon={<Building2 size={20} />} color="var(--primary)" />
       </div>
 
+      {/* Filtre & Aksiyon Çubuğu */}
+      <div className="card" style={{ marginBottom: '1.5rem', padding: '1.25rem 1.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '155px' }}>
+            <label className="label-sm">Tesis</label>
+            <select className="input" value={filterFacility} onChange={e => setFilterFacility(e.target.value)}>
+              <option value="">Tüm Tesisler</option>
+              {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '140px' }}>
+            <label className="label-sm">Araç Tipi</label>
+            <select className="input" value={filterType} onChange={e => setFilterType(e.target.value)}>
+              <option value="">Tüm Tipler</option>
+              {[...new Set(vehicles.map(v => v.vehicle_type).filter(Boolean))].map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '130px' }}>
+            <label className="label-sm">Marka</label>
+            <select className="input" value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
+              <option value="">Tüm Markalar</option>
+              {[...new Set(vehicles.map(v => v.brand).filter(Boolean))].sort().map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '130px' }}>
+            <label className="label-sm">Model</label>
+            <input className="input" placeholder="Model ara..." value={filterModel} onChange={e => setFilterModel(e.target.value)} />
+          </div>
+          {(filterFacility || filterType || filterBrand || filterModel) && (
+            <button className="btn btn-ghost" style={{ alignSelf: 'flex-end' }}
+              onClick={() => { setFilterFacility(''); setFilterType(''); setFilterBrand(''); setFilterModel(''); }}>
+              <X size={14} /> Temizle
+            </button>
+          )}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.75rem', alignSelf: 'flex-end' }}>
+            <button className="btn btn-ghost" style={{ fontSize: '0.85rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              onClick={() => window.print()}>
+              🖨️ Yazdır
+            </button>
+            <button className="btn btn-ghost" style={{ fontSize: '0.85rem', fontWeight: '700', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              onClick={exportCSV}>
+              📊 Excel'e Aktar
+            </button>
+          </div>
+        </div>
+        {(filterFacility || filterType || filterBrand || filterModel) && (
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginTop: '0.75rem' }}>
+            <strong>{filteredVehicles.length}</strong> / {vehicles.length} araç gösteriliyor
+          </p>
+        )}
+      </div>
+
       <div className="card" style={{ padding: '0' }}>
         <table style={{ width: '100%' }}>
           <thead>
@@ -543,9 +622,11 @@ const Vehicles = () => {
           <tbody>
             {loading ? (
               <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem' }}>Yükleniyor...</td></tr>
-            ) : vehicles.length === 0 ? (
-              <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem' }}>Henüz araç tanımlanmamış.</td></tr>
-            ) : vehicles.map(v => (
+            ) : filteredVehicles.length === 0 ? (
+              <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem' }}>
+                {vehicles.length === 0 ? 'Henüz araç tanımlanmamış.' : 'Filtreyle eşleşen araç bulunamadı.'}
+              </td></tr>
+            ) : filteredVehicles.map(v => (
               <tr key={v.id} style={{ borderBottom: '1px solid var(--bg-main)', cursor: 'pointer' }}
                 onClick={() => openDetail(v)}
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
