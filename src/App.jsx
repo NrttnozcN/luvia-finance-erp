@@ -43,6 +43,9 @@ import { supabase } from './lib/supabase';
 
 import useAuthStore, { ROLE_PERMISSIONS } from './store/authStore';
 
+const daysUntil = (d) => d ? Math.ceil((new Date(d) - new Date()) / 86400000) : null;
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
+
 const getInitials = (name) => {
   if (!name) return '??';
   const parts = name.trim().split(' ').filter(Boolean);
@@ -73,6 +76,7 @@ const App = () => {
     pendingInvoices: 0
   });
   const [loading, setLoading] = useState(true);
+  const [upcomingAlerts, setUpcomingAlerts] = useState([]);
 
   // SQL'DEN GERÇEK İSTATİSTİKLERİ ÇEK
   const fetchDashboardStats = async () => {
@@ -102,8 +106,21 @@ const App = () => {
     setLoading(false);
   };
 
+  const fetchUpcomingAlerts = async () => {
+    const future = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0];
+    const [{ data: insps }, { data: insurs }] = await Promise.all([
+      supabase.from('vehicle_inspections').select('id, type, expiry_date, vehicles(plate)').not('expiry_date', 'is', null).lte('expiry_date', future).order('expiry_date').limit(10),
+      supabase.from('vehicle_insurances').select('id, insurance_type, expiry_date, company, vehicles(plate)').not('expiry_date', 'is', null).lte('expiry_date', future).order('expiry_date').limit(10),
+    ]);
+    const items = [
+      ...(insps || []).map(i => ({ id: `i-${i.id}`, category: 'Muayene', label: `${i.type} — ${i.vehicles?.plate || ''}`, expiry: i.expiry_date, days: daysUntil(i.expiry_date) })),
+      ...(insurs || []).map(i => ({ id: `s-${i.id}`, category: 'Sigorta', label: `${i.insurance_type}${i.company ? ' (' + i.company + ')' : ''} — ${i.vehicles?.plate || ''}`, expiry: i.expiry_date, days: daysUntil(i.expiry_date) })),
+    ].sort((a, b) => a.days - b.days);
+    setUpcomingAlerts(items);
+  };
+
   useEffect(() => {
-    if (currentUser) fetchDashboardStats();
+    if (currentUser) { fetchDashboardStats(); fetchUpcomingAlerts(); }
   }, [currentUser, activeModule]);
 
   useEffect(() => {
@@ -254,22 +271,24 @@ const App = () => {
         <div className="col-span-2">
           <div className="card" style={{ marginBottom: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem' }}>Kritik Bildirimler</h3>
+              <h3 style={{ fontSize: '1.25rem' }}>Yaklaşan Muayene & Sigorta</h3>
               <button className="btn btn-ghost" onClick={() => setActiveModule('alert-center')}>Tümünü Gör</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <AlertItem 
-                icon={<AlertCircle color="var(--danger)" />} 
-                title="Muayenesi Geçen Araçlar" 
-                desc="34 LUV 001 plakalı aracın muayenesi 2 gün geçti."
-                time="10 dk önce"
-              />
-              <AlertItem 
-                icon={<Clock color="var(--warning)" />} 
-                title="Vadesi Yaklaşan Çekler" 
-                desc="Gelecek 3 gün içinde 45.000 TL ödemeniz bulunuyor."
-                time="2 saat önce"
-              />
+              {upcomingAlerts.length === 0 ? (
+                <p className="text-dim" style={{ textAlign: 'center', padding: '1.5rem', fontSize: '0.85rem' }}>Son 60 günde yaklaşan muayene veya sigorta yok.</p>
+              ) : upcomingAlerts.slice(0, 5).map(a => (
+                <AlertItem
+                  key={a.id}
+                  icon={a.days !== null && a.days < 0 ? <AlertCircle color="var(--danger)" /> : <Clock color="var(--warning)" />}
+                  title={`${a.category}: ${a.label}`}
+                  desc={a.days !== null && a.days < 0
+                    ? `${Math.abs(a.days)} gün geçti — ${fmtDate(a.expiry)}`
+                    : a.days === 0 ? `Bugün sona eriyor — ${fmtDate(a.expiry)}`
+                    : `${a.days} gün kaldı — ${fmtDate(a.expiry)}`}
+                  time={a.days !== null && a.days < 0 ? 'Süresi geçmiş!' : a.days === 0 ? 'Bugün!' : `${a.days} gün`}
+                />
+              ))}
             </div>
           </div>
           

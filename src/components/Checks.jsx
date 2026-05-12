@@ -23,6 +23,7 @@ const Checks = () => {
   const [customers, setCustomers] = useState([]);
   const [newCheck, setNewCheck] = useState({
     type: 'Müşteri Çeki',
+    check_no: '',
     due_date: new Date().toISOString().split('T')[0],
     amount: 0,
     bank_name: '',
@@ -53,6 +54,7 @@ const Checks = () => {
     }
     const payload = {
       type: newCheck.type,
+      check_no: newCheck.check_no || null,
       due_date: newCheck.due_date,
       amount: Number(newCheck.amount),
       bank_name: newCheck.bank_name,
@@ -64,7 +66,7 @@ const Checks = () => {
     else {
       setShowAddModal(false);
       fetchData();
-      setNewCheck({ type: 'Müşteri Çeki', due_date: new Date().toISOString().split('T')[0], amount: 0, bank_name: '', customer_id: '', status: 'Portföyde' });
+      setNewCheck({ type: 'Müşteri Çeki', check_no: '', due_date: new Date().toISOString().split('T')[0], amount: 0, bank_name: '', customer_id: '', status: 'Portföyde' });
     }
   };
 
@@ -136,6 +138,7 @@ const Checks = () => {
               <th>Tür</th>
               <th>Cari / Keşideci</th>
               <th>Banka</th>
+              <th>Çek No</th>
               <th style={{ textAlign: 'right' }}>Tutar</th>
               <th>Durum</th>
               <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>İşlem</th>
@@ -143,9 +146,9 @@ const Checks = () => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem' }}>Yükleniyor...</td></tr>
+              <tr><td colSpan="8" style={{ textAlign: 'center', padding: '3rem' }}>Yükleniyor...</td></tr>
             ) : checks.length === 0 ? (
-              <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem' }}>Henüz çek/senet kaydı bulunmuyor.</td></tr>
+              <tr><td colSpan="8" style={{ textAlign: 'center', padding: '3rem' }}>Henüz çek/senet kaydı bulunmuyor.</td></tr>
             ) : (
               checks.map(c => (
                 <tr key={c.id} style={{ borderBottom: '1px solid var(--bg-main)' }}>
@@ -158,6 +161,7 @@ const Checks = () => {
                   <td><span className={`badge ${c.type === 'Müşteri Çeki' ? 'badge-primary' : 'badge-warning'}`}>{c.type}</span></td>
                   <td style={{ fontWeight: '600' }}>{c.customers?.name || 'Genel'}</td>
                   <td className="text-dim">{c.bank_name}</td>
+                  <td style={{ fontSize: '0.82rem', color: 'var(--text-dim)', fontFamily: 'monospace' }}>{c.check_no || '—'}</td>
                   <td style={{ textAlign: 'right', fontWeight: '800', color: 'var(--primary)' }}>₺{c.amount.toLocaleString()}</td>
                   <td>
                     <span style={{ fontSize: '0.75rem', fontWeight: '700', padding: '0.2rem 0.6rem', borderRadius: '20px',
@@ -230,6 +234,7 @@ const Checks = () => {
               <InputGroup label="Vade Tarihi" type="date" value={editCheck.due_date} onChange={e => setEditCheck({ ...editCheck, due_date: e.target.value })} />
               <InputGroup label="Tutar (₺)" type="number" value={editCheck.amount} onChange={e => setEditCheck({ ...editCheck, amount: e.target.value })} />
               <InputGroup label="Banka / Şube" placeholder="Garanti BBVA" value={editCheck.bank_name || ''} onChange={e => setEditCheck({ ...editCheck, bank_name: e.target.value })} />
+              <InputGroup label="Çek No / Senet No" placeholder="Opsiyonel" value={editCheck.check_no || ''} onChange={e => setEditCheck({ ...editCheck, check_no: e.target.value })} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
               <label className="label-sm">Keşideci / Cari</label>
@@ -310,6 +315,7 @@ const Checks = () => {
               <InputGroup label="Vade Tarihi" type="date" value={newCheck.due_date} onChange={(e) => setNewCheck({...newCheck, due_date: e.target.value})} />
               <InputGroup label="Tutar (₺)" type="number" value={newCheck.amount} onChange={(e) => setNewCheck({...newCheck, amount: e.target.value})} />
               <InputGroup label="Banka / Şube" placeholder="Örn: Garanti BBVA" value={newCheck.bank_name} onChange={(e) => setNewCheck({...newCheck, bank_name: e.target.value})} />
+              <InputGroup label="Çek No / Senet No" placeholder="Opsiyonel" value={newCheck.check_no} onChange={(e) => setNewCheck({...newCheck, check_no: e.target.value})} />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>

@@ -27,7 +27,7 @@ const CustomerMovementReport = () => {
       const [invRes, txnRes, chkRes] = await Promise.all([
         supabase.from('invoices').select('id, invoice_no, date, total_amount, description').eq('customer_id', custId).order('date'),
         supabase.from('finance_transactions').select('id, date, amount, type, description').eq('customer_id', custId).order('date'),
-        supabase.from('checks').select('id, due_date, amount, type, bank_name, status').eq('customer_id', custId).order('due_date'),
+        supabase.from('checks').select('id, check_no, due_date, amount, type, bank_name, status').eq('customer_id', custId).order('due_date'),
       ]);
 
       const invs = invRes?.data || [];
@@ -37,13 +37,15 @@ const CustomerMovementReport = () => {
       const rows = [
         ...invs.map(inv => ({
           date: inv.date,
-          description: `Fatura #${inv.invoice_no}${inv.description ? ' – ' + inv.description : ''}`,
+          doc_no: inv.invoice_no || '—',
+          description: `Fatura${inv.description ? ' – ' + inv.description : ''}`,
           borc: Number(inv.total_amount),
           alacak: 0,
           type: 'invoice',
         })),
         ...txns.map(tx => ({
           date: tx.date,
+          doc_no: '—',
           description: `${tx.type}${tx.description ? ' – ' + tx.description : ''}`,
           borc: ['Ödeme', 'Gider'].includes(tx.type) ? Number(tx.amount) : 0,
           alacak: ['Tahsilat', 'Gelir'].includes(tx.type) ? Number(tx.amount) : 0,
@@ -53,6 +55,7 @@ const CustomerMovementReport = () => {
           const isAlacak = ['Müşteri Çeki', 'Müşteri Senedi'].includes(chk.type);
           return {
             date: chk.due_date,
+            doc_no: chk.check_no || '—',
             description: `${chk.type}${chk.bank_name ? ' – ' + chk.bank_name : ''} (${chk.status})`,
             borc:   isAlacak ? 0 : Number(chk.amount),
             alacak: isAlacak ? Number(chk.amount) : 0,
@@ -79,6 +82,7 @@ const CustomerMovementReport = () => {
     const rows = movements.map(m => `
       <tr>
         <td>${fmtDate(m.date)}</td>
+        <td style="font-family:monospace;font-size:9.5pt;color:#64748b">${m.doc_no}</td>
         <td>${m.description}</td>
         <td style="text-align:right;color:#ef4444">${m.borc > 0 ? '₺' + fmt(m.borc) : '—'}</td>
         <td style="text-align:right;color:#10b981">${m.alacak > 0 ? '₺' + fmt(m.alacak) : '—'}</td>
@@ -111,14 +115,14 @@ const CustomerMovementReport = () => {
       </div>
       <table>
         <thead><tr>
-          <th>Tarih</th><th>Açıklama</th>
+          <th>Tarih</th><th>Belge No</th><th>Açıklama</th>
           <th style="text-align:right;color:#ef4444">Borç ▲</th>
           <th style="text-align:right;color:#10b981">Alacak ▼</th>
           <th style="text-align:right">Bakiye</th>
         </tr></thead>
         <tbody>${rows}</tbody>
         <tfoot><tr>
-          <td colspan="2">GENEL TOPLAM</td>
+          <td colspan="3">GENEL TOPLAM</td>
           <td style="text-align:right;color:#ef4444">₺${fmt(totalBorc)}</td>
           <td style="text-align:right;color:#10b981">₺${fmt(totalAlacak)}</td>
           <td style="text-align:right">₺${fmt(Math.abs(netBakiye))} ${netBakiye > 0 ? 'B' : 'A'}</td>
@@ -196,6 +200,7 @@ const CustomerMovementReport = () => {
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--border)' }}>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: '700' }}>Tarih</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: '700' }}>Belge No</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: '700' }}>Açıklama</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontSize: '0.82rem', color: 'var(--danger)', fontWeight: '700' }}>Borç ▲</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontSize: '0.82rem', color: 'var(--success)', fontWeight: '700' }}>Alacak ▼</th>
@@ -212,6 +217,9 @@ const CustomerMovementReport = () => {
                       }}>
                         <td style={{ padding: '0.9rem 1rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
                           {fmtDate(m.date)}
+                        </td>
+                        <td style={{ padding: '0.9rem 1rem', fontSize: '0.8rem', color: 'var(--text-dim)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                          {m.doc_no}
                         </td>
                         <td style={{ padding: '0.9rem 1rem', fontSize: '0.9rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -244,7 +252,7 @@ const CustomerMovementReport = () => {
                   </tbody>
                   <tfoot>
                     <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--bg-main)' }}>
-                      <td colSpan={2} style={{ padding: '1rem', fontWeight: '800', fontSize: '0.9rem' }}>GENEL TOPLAM</td>
+                      <td colSpan={3} style={{ padding: '1rem', fontWeight: '800', fontSize: '0.9rem' }}>GENEL TOPLAM</td>
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '800', color: 'var(--danger)' }}>₺{fmt(totalBorc)}</td>
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '800', color: 'var(--success)' }}>₺{fmt(totalAlacak)}</td>
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '800', color: netBakiye > 0 ? 'var(--danger)' : 'var(--success)' }}>
