@@ -5,7 +5,7 @@ import {
   TrendingDown, FileText, BarChart3, Bell, RefreshCcw, ShieldCheck,
   FolderOpen, PieChart, LogOut, ChevronDown, ChevronRight, MessageCircle, TrendingUp,
 } from 'lucide-react';
-import useAuthStore, { ROLE_PERMISSIONS } from '../store/authStore';
+import useAuthStore, { ROLE_DISPLAY_META } from '../store/authStore';
 import { supabase } from '../lib/supabase';
 
 const NAV_GROUPS = [
@@ -96,7 +96,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
 
   const toggleGroup = (label) => setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }));
 
-  const roleMeta = currentUser ? ROLE_PERMISSIONS[currentUser.role] : null;
+  const roleColor = ROLE_DISPLAY_META[currentUser?.role]?.color || '#64748b';
 
   useEffect(() => {
     if (currentUser?.role === 'Admin') {
@@ -176,7 +176,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
           </div>
           <div style={{ flex: 1, textAlign: 'left', overflow: 'hidden' }}>
             <p style={{ fontSize: '0.83rem', fontWeight: '700', color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser?.name}</p>
-            <p style={{ fontSize: '0.68rem', fontWeight: '600', color: roleMeta?.color || '#64748b', marginTop: '1px' }}>{roleMeta?.label || ''}</p>
+            <p style={{ fontSize: '0.68rem', fontWeight: '600', color: roleColor, marginTop: '1px' }}>{currentUser?.roleLabel || ''}</p>
           </div>
           <ChevronDown size={14} style={{ color: '#475569', transform: showUserMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
         </button>

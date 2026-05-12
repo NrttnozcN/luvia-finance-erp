@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
-import useAuthStore, { ROLE_PERMISSIONS } from './store/authStore';
+import useAuthStore, { ROLE_DISPLAY_META } from './store/authStore';
 
 const daysUntil = (d) => d ? Math.ceil((new Date(d) - new Date()) / 86400000) : null;
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
@@ -445,7 +445,7 @@ const App = () => {
               <div className="avatar">{getInitials(currentUser?.name)}</div>
               <div className="user-info">
                 <span className="user-name">{currentUser?.name?.split(' ').slice(0, 2).join(' ')}</span>
-                <span className="user-role">{ROLE_PERMISSIONS[currentUser?.role]?.label || currentUser?.role}</span>
+                <span className="user-role">{currentUser?.roleLabel || currentUser?.role}</span>
               </div>
             </div>
           </div>

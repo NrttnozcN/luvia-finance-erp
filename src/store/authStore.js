@@ -2,61 +2,47 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
 
-// ─── Rol → Modül Erişim Tablosu ──────────────────────────────────────────────
-export const ROLE_PERMISSIONS = {
-  SuperAdmin: {
-    label: 'Platform Sahibi',
-    color: '#7C3AED',
-    badgeStyle: { background: '#ede9fe', color: '#5b21b6' },
-    modules: 'all',
-    canWrite: true,
-    description: 'Platform sahibi — tüm firmalara ve modüllere tam erişim',
-  },
-  Admin: {
-    label: 'Süper Admin',
-    color: '#FF6B00',
-    badgeStyle: { background: '#fff0e6', color: '#c2400a' },
-    modules: 'all',
-    canWrite: true,
-    description: 'Tüm modüllere tam erişim',
-  },
-  Muhasebe: {
-    label: 'Muhasebe',
-    color: '#22C55E',
-    badgeStyle: { background: '#dcfce7', color: '#166534' },
-    modules: ['dashboard', 'cariler', 'invoices', 'wallets', 'checks', 'rev_exp', 'ledgers', 'costs', 'sales', 'logs', 'alerts', 'transfers', 'cari_rapor', 'kasa_rapor'],
-    canWrite: true,
-    description: 'Finans ve muhasebe modüllerine tam erişim',
-  },
-  Operasyon: {
-    label: 'Operasyon',
-    color: '#F59E0B',
-    badgeStyle: { background: '#fef3c7', color: '#92400e' },
-    modules: ['dashboard', 'facilities', 'stock', 'vehicles', 'fuel', 'tires', 'purchasing', 'personnel', 'alerts'],
-    canWrite: true,
-    description: 'Filo ve operasyon modüllerine tam erişim',
-  },
-  Izleme: {
-    label: 'Sadece İzleme',
-    color: '#64748B',
-    badgeStyle: { background: '#f1f5f9', color: '#475569' },
-    modules: ['dashboard', 'costs', 'sales', 'alerts'],
-    canWrite: false,
-    description: 'Yalnızca rapor ve dashboard görüntüleme',
-  },
+// Sadece görsel etiket/renk — SuperAdmin & Admin için (DB'de rol girişi yok)
+export const ROLE_DISPLAY_META = {
+  SuperAdmin: { label: 'Platform Sahibi', color: '#7C3AED' },
+  Admin:      { label: 'Süper Admin',     color: '#FF6B00' },
 };
 
-// ─── Modül → Erişim Matrisi (Rol Yetkileri ekranı için) ──────────────────────
+// Rol & Yetki ekranı için modül matrisi
 export const MODULE_MATRIX = [
-  { group: 'Finans Yönetimi',    tabs: ['cariler', 'invoices', 'wallets', 'checks', 'rev_exp'] },
-  { group: 'Operasyon & Filo',   tabs: ['facilities', 'stock', 'vehicles', 'fuel', 'tires', 'purchasing'] },
-  { group: 'İnsan Kaynakları',   tabs: ['personnel'] },
-  { group: 'Muhasebe & Defter',  tabs: ['ledgers', 'transfers'] },
-  { group: 'Raporlama',          tabs: ['costs', 'sales', 'logs'] },
-  { group: 'Sistem',             tabs: ['settings', 'definitions', 'alerts'] },
+  { group: 'Genel',             items: ['dashboard', 'facilities'] },
+  { group: 'Finans Yönetimi',   items: ['cariler', 'invoices', 'wallets', 'rev_exp', 'checks'] },
+  { group: 'Operasyon & Filo',  items: ['stock', 'vehicles', 'fuel', 'tires', 'purchasing'] },
+  { group: 'İnsan Kaynakları',  items: ['personnel'] },
+  { group: 'Muhasebe & Defter', items: ['ledgers', 'transfers'] },
+  { group: 'Raporlama',         items: ['costs', 'sales', 'logs', 'cari_rapor', 'kasa_rapor'] },
+  { group: 'Sistem',            items: ['alerts', 'settings', 'definitions'] },
 ];
 
-// ─── Auth Store (Sadece Oturum Yönetimi) ──────────────────────────────────────
+export const MODULE_LABELS = {
+  dashboard:  'Gösterge Paneli',      facilities: 'Tesisler',
+  cariler:    'Cariler',              invoices:   'Faturalar',
+  wallets:    'Kasalar & Banka',      rev_exp:    'Gelir & Gider',
+  checks:     'Çek & Senet',         stock:      'Stok & Depo',
+  vehicles:   'Araç Yönetimi',       fuel:       'Akaryakıt Takibi',
+  tires:      'Lastik İşlemleri',    purchasing: 'Satın Alma',
+  personnel:  'Personel & Puantaj',
+  ledgers:    'Defter İşlemleri',    transfers:  'Toplu Devirler',
+  costs:      'Maliyet Raporları',   sales:      'Satış Raporları',
+  logs:       'Döküman Yönetimi',    cari_rapor: 'Cari Hareket Raporu',
+  kasa_rapor: 'Kasa Hareket Raporu',
+  alerts:     'Uyarı Merkezi',       settings:   'Sistem Ayarları',
+  definitions: 'Tanımlamalar',
+};
+
+// Geçiş güvenliği: role_id atanmamış mevcut kullanıcılar için fallback
+const LEGACY_PERMISSIONS = {
+  Muhasebe:  ['dashboard', 'cariler', 'invoices', 'wallets', 'checks', 'rev_exp',
+               'ledgers', 'costs', 'sales', 'logs', 'alerts', 'transfers', 'cari_rapor', 'kasa_rapor'],
+  Operasyon: ['dashboard', 'facilities', 'stock', 'vehicles', 'fuel', 'tires', 'purchasing', 'personnel', 'alerts'],
+  Izleme:    ['dashboard', 'costs', 'sales', 'alerts'],
+};
+
 const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -68,7 +54,7 @@ const useAuthStore = create(
 
         const { data: users, error } = await supabase
           .from('profiles')
-          .select('*, companies(*)')
+          .select('*, companies(*), roles(name, permissions)')
           .eq('password', password);
 
         if (error || !users || users.length === 0) {
@@ -86,7 +72,6 @@ const useAuthStore = create(
           return false;
         }
 
-        // Firma lisans ve durum kontrolü (SuperAdmin için atlanır)
         if (user.companies) {
           if (user.companies.status === 'passive') {
             set({ loginError: 'Firmanızın hesabı askıya alınmıştır. Lütfen Ülgen Soft ile iletişime geçin.' });
@@ -103,37 +88,38 @@ const useAuthStore = create(
         }
 
         const safeUser = {
-          id: user.id,
-          name: user.full_name,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          company_id: user.company_id || null,
+          id:          user.id,
+          name:        user.full_name,
+          username:    user.username,
+          email:       user.email,
+          role:        user.role,
+          role_id:     user.role_id || null,
+          roleLabel:   user.roles?.name || ROLE_DISPLAY_META[user.role]?.label || user.role,
+          permissions: user.roles?.permissions || null,
+          company_id:  user.company_id || null,
           companyName: user.companies?.name || null,
-          status: 'active',
+          status:      'active',
         };
 
         set({ currentUser: safeUser, loginError: null });
         return true;
       },
 
-      logout: () => {
-        set({ currentUser: null });
-      },
-
+      logout: () => set({ currentUser: null }),
       clearError: () => set({ loginError: null }),
 
       canAccess: (tab) => {
         const user = get().currentUser;
         if (!user) return false;
-        const perm = ROLE_PERMISSIONS[user.role];
-        if (!perm) return false;
-        return perm.modules === 'all' || perm.modules.includes(tab);
-      }
+        if (user.role === 'SuperAdmin' || user.role === 'Admin') return true;
+        if (user.permissions) return Array.isArray(user.permissions) && user.permissions.includes(tab);
+        const legacy = LEGACY_PERMISSIONS[user.role];
+        if (!legacy) return false;
+        return legacy.includes(tab);
+      },
     }),
     {
       name: 'luvia_auth_storage',
-      // Sadece currentUser'ı local storage'da tut, kullanıcı listesi artık tamamen DB'den
       partialize: (state) => ({ currentUser: state.currentUser }),
     }
   )
