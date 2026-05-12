@@ -20,6 +20,8 @@ import AlertCenter from './components/AlertCenter';
 import BulkTransfers from './components/BulkTransfers';
 import Ledgers from './components/Ledgers';
 import Facilities from './components/Facilities';
+import CustomerMovementReport from './components/CustomerMovementReport';
+import SupportTickets from './components/SupportTickets';
 import Login from './components/Login';
 import { 
   Bell, 
@@ -53,6 +55,9 @@ const App = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearch, setShowSearch] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportForm, setSupportForm] = useState({ title: '', description: '' });
+  const [supportSending, setSupportSending] = useState(false);
   const [stats, setStats] = useState({
     totalSales: 0,
     vehicleCount: 0,
@@ -138,6 +143,8 @@ const App = () => {
       case 'bulk-transfers': case 'transfers': return <BulkTransfers />;
       case 'ledgers': return <Ledgers />;
       case 'facilities': return <Facilities />;
+      case 'cari_rapor': return <CustomerMovementReport />;
+      case 'support_tickets': return <SupportTickets />;
       default: return renderDashboard();
     }
   };
@@ -228,12 +235,39 @@ const App = () => {
           <div className="card" style={{ background: 'var(--primary)', color: 'white' }}>
             <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Yardım Merkezi</h3>
             <p style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '1.5rem' }}>Sistemle ilgili bir sorun mu yaşıyorsunuz? Destek ekibimize ulaşın.</p>
-            <button className="btn" style={{ background: 'white', color: 'var(--primary)', width: '100%' }} onClick={() => window.open('mailto:destek@luvia.com?subject=Destek Talebi&body=Merhaba, sistemle ilgili bir sorun yaşıyorum:%0A%0ASorun: %0AModül: %0A', '_blank')}>Destek Talebi Oluştur</button>
+            <button className="btn" style={{ background: 'white', color: 'var(--primary)', width: '100%' }} onClick={() => setShowSupportModal(true)}>Destek Talebi Oluştur</button>
           </div>
         </div>
       </div>
     </div>
   );
+
+  const handleSupportSubmit = async () => {
+    if (!supportForm.title.trim()) return;
+    setSupportSending(true);
+    const { data: ticket } = await supabase.from('support_tickets').insert([{
+      user_id: currentUser?.id,
+      user_name: currentUser?.name,
+      user_email: currentUser?.email,
+      title: supportForm.title.trim(),
+      description: supportForm.description.trim(),
+      status: 'Açık',
+    }]).select().single();
+    if (ticket) {
+      await supabase.from('support_messages').insert([{
+        ticket_id: ticket.id,
+        sender_id: currentUser?.id,
+        sender_name: currentUser?.name,
+        sender_role: currentUser?.role,
+        message: supportForm.description.trim() || supportForm.title.trim(),
+        is_admin_reply: false,
+      }]);
+    }
+    setSupportSending(false);
+    setShowSupportModal(false);
+    setSupportForm({ title: '', description: '' });
+    alert('✅ Destek talebiniz oluşturuldu. Admin ekibi en kısa sürede dönüş yapacaktır.');
+  };
 
   return (
     <div className="app-container">
@@ -291,6 +325,34 @@ const App = () => {
           {renderContent()}
         </div>
       </main>
+
+      {/* Destek Talebi Modal */}
+      {showSupportModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem' }}>Destek Talebi Oluştur</h2>
+              <button onClick={() => setShowSupportModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Konu *</label>
+                <input className="input" value={supportForm.title} onChange={e => setSupportForm({ ...supportForm, title: e.target.value })} placeholder="Sorunuzu kısaca belirtin" />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Açıklama</label>
+                <textarea className="input" value={supportForm.description} onChange={e => setSupportForm({ ...supportForm, description: e.target.value })} placeholder="Detayları açıklayın (hangi modül, hangi adım, hata mesajı...)" rows={4} style={{ resize: 'vertical' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button className="btn btn-ghost" onClick={() => setShowSupportModal(false)} style={{ flex: 1 }}>İptal</button>
+              <button className="btn btn-primary" onClick={handleSupportSubmit} disabled={supportSending || !supportForm.title.trim()} style={{ flex: 2 }}>
+                {supportSending ? 'Gönderiliyor...' : '📩 Talebi Gönder'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

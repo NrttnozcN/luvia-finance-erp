@@ -16,7 +16,7 @@ export const ROLE_PERMISSIONS = {
     label: 'Muhasebe',
     color: '#22C55E',
     badgeStyle: { background: '#dcfce7', color: '#166534' },
-    modules: ['dashboard', 'cariler', 'invoices', 'wallets', 'checks', 'rev_exp', 'ledgers', 'costs', 'sales', 'logs', 'alerts', 'transfers'],
+    modules: ['dashboard', 'cariler', 'invoices', 'wallets', 'checks', 'rev_exp', 'ledgers', 'costs', 'sales', 'logs', 'alerts', 'transfers', 'cari_rapor'],
     canWrite: true,
     description: 'Finans ve muhasebe modüllerine tam erişim',
   },

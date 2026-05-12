@@ -3,9 +3,10 @@ import {
   LayoutDashboard, Users, Receipt, Package, Settings, Building2, Wallet,
   Truck, Fuel, Disc, FileSpreadsheet, Briefcase, History, ShoppingCart,
   TrendingDown, FileText, BarChart3, Bell, RefreshCcw, ShieldCheck,
-  FolderOpen, PieChart, LogOut, ChevronDown,
+  FolderOpen, PieChart, LogOut, ChevronDown, MessageCircle, TrendingUp,
 } from 'lucide-react';
 import useAuthStore, { ROLE_PERMISSIONS } from '../store/authStore';
+import { supabase } from '../lib/supabase';
 
 const NAV_GROUPS = [
   {
@@ -44,19 +45,21 @@ const NAV_GROUPS = [
   {
     label: 'Raporlama & Arşiv',
     items: [
-      { icon: <FileText size={18} />,        label: 'Defter İşlemleri',  tab: 'ledgers' },
-      { icon: <BarChart3 size={18} />,       label: 'Maliyet Raporları', tab: 'costs' },
-      { icon: <PieChart size={18} />,        label: 'Satış Raporları',   tab: 'sales' },
-      { icon: <FolderOpen size={18} />,      label: 'Döküman Yönetimi',  tab: 'logs' },
+      { icon: <FileText size={18} />,        label: 'Defter İşlemleri',      tab: 'ledgers' },
+      { icon: <TrendingUp size={18} />,      label: 'Cari Hareket Raporu',   tab: 'cari_rapor' },
+      { icon: <BarChart3 size={18} />,       label: 'Maliyet Raporları',     tab: 'costs' },
+      { icon: <PieChart size={18} />,        label: 'Satış Raporları',       tab: 'sales' },
+      { icon: <FolderOpen size={18} />,      label: 'Döküman Yönetimi',      tab: 'logs' },
     ],
   },
   {
     label: 'Sistem',
     items: [
-      { icon: <Bell size={18} />,            label: 'Uyarı Merkezi',     tab: 'alerts' },
-      { icon: <Settings size={18} />,        label: 'Sistem Ayarları',   tab: 'settings' },
-      { icon: <RefreshCcw size={18} />,      label: 'Toplu Devirler',    tab: 'transfers' },
-      { icon: <ShieldCheck size={18} />,     label: 'Tanımlamalar',      tab: 'definitions' },
+      { icon: <Bell size={18} />,            label: 'Uyarı Merkezi',         tab: 'alerts' },
+      { icon: <MessageCircle size={18} />,   label: 'Destek Talepleri',      tab: 'support_tickets' },
+      { icon: <Settings size={18} />,        label: 'Sistem Ayarları',       tab: 'settings' },
+      { icon: <RefreshCcw size={18} />,      label: 'Toplu Devirler',        tab: 'transfers' },
+      { icon: <ShieldCheck size={18} />,     label: 'Tanımlamalar',          tab: 'definitions' },
     ],
   },
 ];
@@ -73,8 +76,16 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
   const logout = useAuthStore(s => s.logout);
   const canAccess = useAuthStore(s => s.canAccess);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [openTickets, setOpenTickets] = useState(0);
 
   const roleMeta = currentUser ? ROLE_PERMISSIONS[currentUser.role] : null;
+
+  useEffect(() => {
+    if (currentUser?.role === 'Admin') {
+      supabase.from('support_tickets').select('id', { count: 'exact', head: true }).eq('status', 'Açık')
+        .then(({ count }) => setOpenTickets(count || 0));
+    }
+  }, [currentUser]);
 
   return (
     <aside className="sidebar">
@@ -104,6 +115,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
                   label={item.label}
                   active={activeTab === item.tab}
                   onClick={() => setActiveTab(item.tab)}
+                  badge={item.tab === 'support_tickets' && openTickets > 0 ? openTickets : null}
                 />
               ))}
             </div>
@@ -152,14 +164,19 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
   );
 };
 
-const NavItem = ({ icon, label, active, onClick }) => (
+const NavItem = ({ icon, label, active, onClick, badge }) => (
   <button
     onClick={onClick}
     className={`nav-item ${active ? 'active' : ''}`}
     style={{ padding: '0.7rem 1rem', fontSize: '0.85rem' }}
   >
     {icon}
-    <span>{label}</span>
+    <span style={{ flex: 1 }}>{label}</span>
+    {badge && (
+      <span style={{ background: 'var(--danger)', color: 'white', borderRadius: '10px', padding: '0.1rem 0.45rem', fontSize: '0.7rem', fontWeight: '800', minWidth: '18px', textAlign: 'center' }}>
+        {badge}
+      </span>
+    )}
   </button>
 );
 
