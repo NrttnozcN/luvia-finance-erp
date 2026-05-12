@@ -35,7 +35,7 @@ const Checks = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: chks } = await supabase.from('checks').select('*, customers!checks_customer_id_fkey(name), ciro_to:customers!checks_ciro_to_customer_id_fkey(name)').order('due_date', { ascending: true });
+    const { data: chks } = await supabase.from('checks').select('*, customers(name)').order('due_date', { ascending: true });
     const { data: custs } = await supabase.from('customers').select('*');
     setChecks(chks || []);
     setCustomers(custs || []);
@@ -158,9 +158,9 @@ const Checks = () => {
                   <td><span className={`badge ${c.type === 'Müşteri Çeki' ? 'badge-primary' : 'badge-warning'}`}>{c.type}</span></td>
                   <td>
                     <span style={{ fontWeight: '600' }}>{c.customers?.name || 'Genel'}</span>
-                    {c.ciro_to?.name && (
+                    {c.ciro_to_customer_id && (
                       <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: '2px' }}>
-                        → {c.ciro_to.name}
+                        → {customers.find(x => x.id === c.ciro_to_customer_id)?.name || '—'}
                       </div>
                     )}
                   </td>
