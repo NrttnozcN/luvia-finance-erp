@@ -144,8 +144,8 @@ const Invoices = ({ initialView = 'list' }) => {
                       <div className="grid grid-cols-4" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
                         <div className="col-span-2">
                           <label className="label-sm">Ürün / Hizmet (Gider Kartı)</label>
-                          <select 
-                            className="input" 
+                          <select
+                            className="input"
                             value={item.material_id}
                             onChange={(e) => {
                               const newItems = [...newInvoice.items];
@@ -173,6 +173,30 @@ const Invoices = ({ initialView = 'list' }) => {
                             setNewInvoice({...newInvoice, items: newItems});
                           }} />
                         </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                        <label className="label-sm" style={{ margin: 0, whiteSpace: 'nowrap' }}>KDV Oranı:</label>
+                        {[0, 1, 8, 20].map(rate => (
+                          <button
+                            key={rate}
+                            type="button"
+                            onClick={() => {
+                              const newItems = [...newInvoice.items];
+                              newItems[idx].vat_rate = rate;
+                              setNewInvoice({...newInvoice, items: newItems});
+                            }}
+                            style={{
+                              padding: '0.3rem 0.75rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', border: '1.5px solid',
+                              background: item.vat_rate === rate ? 'var(--primary)' : 'transparent',
+                              color: item.vat_rate === rate ? 'white' : 'var(--text-muted)',
+                              borderColor: item.vat_rate === rate ? 'var(--primary)' : 'var(--border)',
+                            }}
+                          >%{rate}</button>
+                        ))}
+                        <span style={{ marginLeft: 'auto', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          KDV: ₺{(item.quantity * item.unit_price * item.vat_rate / 100).toLocaleString('tr-TR', {maximumFractionDigits:2})}
+                          &nbsp;· Toplam: ₺{(item.quantity * item.unit_price * (1 + item.vat_rate / 100)).toLocaleString('tr-TR', {maximumFractionDigits:2})}
+                        </span>
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
@@ -246,15 +270,15 @@ const Invoices = ({ initialView = 'list' }) => {
                 <div style={{ marginTop: '1rem', padding: '1.5rem', background: 'var(--bg-main)', borderRadius: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <span className="text-dim">Ara Toplam</span>
-                    <span style={{ fontWeight: '600' }}>₺{newInvoice.items.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0).toLocaleString()}</span>
+                    <span style={{ fontWeight: '600' }}>₺{newInvoice.items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_price)), 0).toLocaleString('tr-TR', {maximumFractionDigits:2})}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <span className="text-dim">KDV Toplam</span>
-                    <span style={{ fontWeight: '600' }}>₺{newInvoice.items.reduce((acc, item) => acc + (item.quantity * item.unit_price * 0.20), 0).toLocaleString()}</span>
+                    <span style={{ fontWeight: '600' }}>₺{newInvoice.items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_price) * item.vat_rate / 100), 0).toLocaleString('tr-TR', {maximumFractionDigits:2})}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', paddingTop: '1rem', borderTop: '2px solid var(--border)' }}>
                     <span style={{ fontWeight: '700' }}>Genel Toplam</span>
-                    <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '1.25rem' }}>₺{newInvoice.items.reduce((acc, item) => acc + (item.quantity * item.unit_price * 1.20), 0).toLocaleString()}</span>
+                    <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '1.25rem' }}>₺{newInvoice.items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_price) * (1 + item.vat_rate / 100)), 0).toLocaleString('tr-TR', {maximumFractionDigits:2})}</span>
                   </div>
                 </div>
 

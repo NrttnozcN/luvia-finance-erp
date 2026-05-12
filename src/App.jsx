@@ -50,6 +50,9 @@ const getInitials = (name) => {
 const App = () => {
   const [activeModule, setActiveModule] = useState('dashboard');
   const currentUser = useAuthStore(s => s.currentUser);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearch, setShowSearch] = useState(false);
   const [stats, setStats] = useState({
     totalSales: 0,
     vehicleCount: 0,
@@ -88,10 +91,26 @@ const App = () => {
   };
 
   useEffect(() => {
-    if (currentUser) {
-      fetchDashboardStats();
-    }
+    if (currentUser) fetchDashboardStats();
   }, [currentUser, activeModule]);
+
+  const handleSearch = async (q) => {
+    setSearchQuery(q);
+    if (q.trim().length < 2) { setSearchResults([]); setShowSearch(false); return; }
+    setShowSearch(true);
+    const term = `%${q.trim()}%`;
+    const [{ data: custs }, { data: invs }, { data: vehs }] = await Promise.all([
+      supabase.from('customers').select('id, name').ilike('name', term).limit(4),
+      supabase.from('invoices').select('id, invoice_no').ilike('invoice_no', term).limit(4),
+      supabase.from('vehicles').select('id, plate').ilike('plate', term).limit(4),
+    ]);
+    const results = [
+      ...(custs || []).map(r => ({ label: r.name, sub: 'Cari', tab: 'cariler' })),
+      ...(invs  || []).map(r => ({ label: r.invoice_no, sub: 'Fatura', tab: 'invoices' })),
+      ...(vehs  || []).map(r => ({ label: r.plate, sub: 'Araç', tab: 'vehicles' })),
+    ];
+    setSearchResults(results);
+  };
 
   if (!currentUser) return <Login />;
 
@@ -99,24 +118,24 @@ const App = () => {
     switch (activeModule) {
       case 'dashboard': return renderDashboard();
       case 'vehicles': return <Vehicles />;
-      case 'customers': return <Customers />;
+      case 'customers': case 'cariler': return <Customers />;
       case 'invoices': return <Invoices />;
       case 'invoices-create': return <Invoices initialView="create" />;
-      case 'finance': return <Finance />;
-      case 'revenue-expense': return <RevenueExpense />;
+      case 'finance': case 'wallets': return <Finance />;
+      case 'revenue-expense': case 'rev_exp': return <RevenueExpense />;
       case 'checks': return <Checks />;
       case 'fuel': return <Fuel />;
       case 'tires': return <Tires />;
       case 'purchasing': return <Purchasing />;
       case 'personnel': return <Personnel />;
-      case 'documents': return <Documents />;
+      case 'documents': case 'logs': return <Documents />;
       case 'settings': return <Settings />;
       case 'stock': return <Stock />;
-      case 'sales-reports': return <SalesReports />;
-      case 'cost-reports': return <CostReports />;
+      case 'sales-reports': case 'sales': return <SalesReports />;
+      case 'cost-reports': case 'costs': return <CostReports />;
       case 'definitions': return <Definitions />;
-      case 'alert-center': return <AlertCenter />;
-      case 'bulk-transfers': return <BulkTransfers />;
+      case 'alert-center': case 'alerts': return <AlertCenter />;
+      case 'bulk-transfers': case 'transfers': return <BulkTransfers />;
       case 'ledgers': return <Ledgers />;
       case 'facilities': return <Facilities />;
       default: return renderDashboard();
@@ -209,7 +228,7 @@ const App = () => {
           <div className="card" style={{ background: 'var(--primary)', color: 'white' }}>
             <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Yardım Merkezi</h3>
             <p style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '1.5rem' }}>Sistemle ilgili bir sorun mu yaşıyorsunuz? Destek ekibimize ulaşın.</p>
-            <button className="btn" style={{ background: 'white', color: 'var(--primary)', width: '100%' }}>Destek Talebi Oluştur</button>
+            <button className="btn" style={{ background: 'white', color: 'var(--primary)', width: '100%' }} onClick={() => window.open('mailto:destek@luvia.com?subject=Destek Talebi&body=Merhaba, sistemle ilgili bir sorun yaşıyorum:%0A%0ASorun: %0AModül: %0A', '_blank')}>Destek Talebi Oluştur</button>
           </div>
         </div>
       </div>
@@ -221,9 +240,35 @@ const App = () => {
       <Sidebar activeTab={activeModule} setActiveTab={setActiveModule} />
       <main className="main-content">
         <header className="top-bar">
-          <div className="search-box">
-            <Search size={18} className="text-dim" />
-            <input type="text" placeholder="Hızlı ara (Müşteri, Fatura, Plaka...)" />
+          <div style={{ position: 'relative' }}>
+            <div className="search-box">
+              <Search size={18} className="text-dim" />
+              <input
+                type="text"
+                placeholder="Hızlı ara (Müşteri, Fatura, Plaka...)"
+                value={searchQuery}
+                onChange={e => handleSearch(e.target.value)}
+                onBlur={() => setTimeout(() => setShowSearch(false), 200)}
+                onFocus={() => searchResults.length > 0 && setShowSearch(true)}
+              />
+            </div>
+            {showSearch && searchResults.length > 0 && (
+              <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 999, overflow: 'hidden' }}>
+                {searchResults.map((r, i) => (
+                  <button key={i} onMouseDown={() => { setActiveModule(r.tab); setSearchQuery(''); setShowSearch(false); }} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', padding: '0.75rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid var(--bg-main)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '700', padding: '0.2rem 0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '6px' }}>{r.sub}</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>{r.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {showSearch && searchResults.length === 0 && searchQuery.length >= 2 && (
+              <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', border: '1px solid var(--border)', borderRadius: '12px', padding: '1rem', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem', zIndex: 999, boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
+                Sonuç bulunamadı
+              </div>
+            )}
           </div>
           <div className="user-nav">
             <button className="btn btn-primary" style={{ background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', borderRadius: '10px' }} onClick={() => setActiveModule('invoices-create')}>

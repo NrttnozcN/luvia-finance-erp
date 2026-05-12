@@ -44,10 +44,19 @@ const Checks = () => {
   }, []);
 
   const handleSave = async () => {
-    const { error } = await supabase
-      .from('checks')
-      .insert([newCheck]);
-
+    if (!newCheck.due_date || !newCheck.amount) {
+      alert('Vade tarihi ve tutar zorunludur.');
+      return;
+    }
+    const payload = {
+      type: newCheck.type,
+      due_date: newCheck.due_date,
+      amount: Number(newCheck.amount),
+      bank_name: newCheck.bank_name,
+      customer_id: newCheck.customer_id || null,
+      status: newCheck.status,
+    };
+    const { error } = await supabase.from('checks').insert([payload]);
     if (error) alert(error.message);
     else {
       setShowAddModal(false);
