@@ -4,6 +4,7 @@ import {
   ArrowLeft, Trash2, X, Gauge, Building2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const fmt = (n) => Number(n || 0).toLocaleString('tr-TR');
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
@@ -30,6 +31,9 @@ const validateVehicle = (v) => {
 };
 
 const Vehicles = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
+
   const [view, setView] = useState('list');
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [activeTab, setActiveTab] = useState('inspections');
@@ -58,8 +62,8 @@ const Vehicles = () => {
   const fetchVehicles = async () => {
     setLoading(true);
     const [{ data: vData }, { data: fData }] = await Promise.all([
-      supabase.from('vehicles').select('*, facilities(name)').order('created_at', { ascending: false }),
-      supabase.from('facilities').select('id, name').order('name'),
+      supabase.from('vehicles').select('*, facilities(name)').eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('facilities').select('id, name').eq('company_id', cid).order('name'),
     ]);
     setVehicles(vData || []);
     setFacilities(fData || []);
@@ -92,7 +96,7 @@ const Vehicles = () => {
     const errs = validateVehicle(newVehicle);
     if (Object.keys(errs).length > 0) { setAddErr(errs); return; }
     setAddErr({});
-    const payload = { ...newVehicle, facility_id: newVehicle.facility_id || null, avg_fuel_consumption: newVehicle.avg_fuel_consumption !== '' ? Number(newVehicle.avg_fuel_consumption) : null };
+    const payload = { ...newVehicle, facility_id: newVehicle.facility_id || null, avg_fuel_consumption: newVehicle.avg_fuel_consumption !== '' ? Number(newVehicle.avg_fuel_consumption) : null, company_id: cid };
     const { error } = await supabase.from('vehicles').insert([payload]);
     if (error) { alert(error.message); return; }
     setShowAddModal(false);

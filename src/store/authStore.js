@@ -57,11 +57,10 @@ const useAuthStore = create(
 
       login: async (identifier, password) => {
         const cleanId = identifier.trim().toLowerCase();
-        
-        // Supabase'den şifresi eşleşen kullanıcıları çekelim
+
         const { data: users, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select('*, companies(id, name)')
           .eq('password', password);
 
         if (error || !users || users.length === 0) {
@@ -69,9 +68,8 @@ const useAuthStore = create(
           return false;
         }
 
-        // Çekilen kullanıcılar içinde email veya username'i eşleşen var mı bakalım
-        const user = users.find(u => 
-          (u.email && u.email.toLowerCase() === cleanId) || 
+        const user = users.find(u =>
+          (u.email && u.email.toLowerCase() === cleanId) ||
           (u.username && u.username.toLowerCase() === cleanId)
         );
 
@@ -86,7 +84,9 @@ const useAuthStore = create(
           username: user.username,
           email: user.email,
           role: user.role,
-          status: 'active'
+          company_id: user.company_id || null,
+          companyName: user.companies?.name || null,
+          status: 'active',
         };
 
         set({ currentUser: safeUser, loginError: null });

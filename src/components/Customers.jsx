@@ -16,10 +16,14 @@ import {
   Wallet
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const emptyForm = { name: '', tax_office: '', tax_no: '', phone: '', email: '', address: '', type: 'Tedarikçi', balance: 0 };
 
 const Customers = () => {
+  const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);
@@ -32,10 +36,10 @@ const Customers = () => {
   const fetchCustomers = async () => {
     setLoading(true);
     const [{ data: custs }, { data: invs }, { data: txns }, { data: chks }] = await Promise.all([
-      supabase.from('customers').select('*').order('name'),
-      supabase.from('invoices').select('customer_id, total_amount'),
-      supabase.from('finance_transactions').select('customer_id, amount, type'),
-      supabase.from('checks').select('customer_id, amount, type'),
+      supabase.from('customers').select('*').eq('company_id', cid).order('name'),
+      supabase.from('invoices').select('customer_id, total_amount').eq('company_id', cid),
+      supabase.from('finance_transactions').select('customer_id, amount, type').eq('company_id', cid),
+      supabase.from('checks').select('customer_id, amount, type').eq('company_id', cid),
     ]);
 
     const balMap = {};
@@ -66,7 +70,7 @@ const Customers = () => {
   }, []);
 
   const handleSave = async () => {
-    const { error } = await supabase.from('customers').insert([newCustomer]);
+    const { error } = await supabase.from('customers').insert([{ ...newCustomer, company_id: cid }]);
     if (error) { alert('Kayıt hatası: ' + error.message); return; }
     setShowAddModal(false);
     fetchCustomers();
