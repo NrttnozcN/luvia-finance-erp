@@ -58,13 +58,14 @@ const Invoices = ({ initialView = 'list' }) => {
     setNewInvoice({
       ...newInvoice,
       items: [...newInvoice.items, { 
-        id: Date.now(), 
-        material_id: '', 
-        quantity: 1, 
-        unit_price: 0, 
-        vat_rate: 20, 
-        allocation_type: 'Depo', 
-        allocation_id: '' 
+        id: Date.now(),
+        material_id: '',
+        quantity: 1,
+        unit_price: 0,
+        vat_rate: 20,
+        tevkifat_rate: 0,
+        allocation_type: 'Depo',
+        allocation_id: ''
       }]
     });
   };
@@ -75,7 +76,13 @@ const Invoices = ({ initialView = 'list' }) => {
       return;
     }
 
-    const total = newInvoice.items.reduce((acc, item) => acc + (item.quantity * item.unit_price * (1 + item.vat_rate / 100)), 0);
+    const itemCalc = (item) => {
+      const matrah = Number(item.quantity) * Number(item.unit_price);
+      const kdv    = matrah * item.vat_rate / 100;
+      const tevk   = kdv * item.tevkifat_rate;
+      return matrah + tevk;
+    };
+    const total = newInvoice.items.reduce((acc, item) => acc + itemCalc(item), 0);
 
     // 1. Faturayı Kaydet
     const { data: invData, error: invError } = await supabase
@@ -101,7 +108,7 @@ const Invoices = ({ initialView = 'list' }) => {
       quantity: item.quantity,
       unit_price: item.unit_price,
       vat_rate: item.vat_rate,
-      total_price: item.quantity * item.unit_price * (1 + item.vat_rate / 100),
+      total_price: (() => { const m = Number(item.quantity)*Number(item.unit_price); return m + m*(item.vat_rate/100)*item.tevkifat_rate; })(),
       allocation_type: item.allocation_type,
       allocation_id: item.allocation_id || null
     }));
@@ -174,30 +181,53 @@ const Invoices = ({ initialView = 'list' }) => {
                           }} />
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                        <label className="label-sm" style={{ margin: 0, whiteSpace: 'nowrap' }}>KDV Oranı:</label>
-                        {[0, 1, 8, 20].map(rate => (
-                          <button
-                            key={rate}
-                            type="button"
-                            onClick={() => {
-                              const newItems = [...newInvoice.items];
-                              newItems[idx].vat_rate = rate;
-                              setNewInvoice({...newInvoice, items: newItems});
-                            }}
-                            style={{
-                              padding: '0.3rem 0.75rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', border: '1.5px solid',
-                              background: item.vat_rate === rate ? 'var(--primary)' : 'transparent',
-                              color: item.vat_rate === rate ? 'white' : 'var(--text-muted)',
-                              borderColor: item.vat_rate === rate ? 'var(--primary)' : 'var(--border)',
-                            }}
-                          >%{rate}</button>
-                        ))}
-                        <span style={{ marginLeft: 'auto', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                          KDV: ₺{(item.quantity * item.unit_price * item.vat_rate / 100).toLocaleString('tr-TR', {maximumFractionDigits:2})}
-                          &nbsp;· Toplam: ₺{(item.quantity * item.unit_price * (1 + item.vat_rate / 100)).toLocaleString('tr-TR', {maximumFractionDigits:2})}
-                        </span>
-                      </div>
+                      {/* KDV + Tevkifat satırı */}
+                      {(() => {
+                        const matrah   = Number(item.quantity) * Number(item.unit_price);
+                        const kdvTutar = matrah * item.vat_rate / 100;
+                        const tevkTutar= kdvTutar * item.tevkifat_rate;
+                        const odenecek = matrah + tevkTutar;
+                        const fmt = (n) => n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem', background: 'var(--bg-main)', borderRadius: '10px', marginBottom: '0.5rem' }}>
+                            {/* KDV seçici */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-muted)', minWidth: '80px' }}>KDV Oranı:</span>
+                              {[0, 1, 8, 20].map(rate => (
+                                <button key={rate} type="button"
+                                  onClick={() => { const ni = [...newInvoice.items]; ni[idx].vat_rate = rate; setNewInvoice({...newInvoice, items: ni}); }}
+                                  style={{ padding: '0.25rem 0.65rem', borderRadius: '7px', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', border: '1.5px solid', background: item.vat_rate === rate ? 'var(--primary)' : 'transparent', color: item.vat_rate === rate ? 'white' : 'var(--text-muted)', borderColor: item.vat_rate === rate ? 'var(--primary)' : 'var(--border)' }}
+                                >%{rate}</button>
+                              ))}
+                              <span style={{ marginLeft: 'auto', fontSize: '0.82rem', color: 'var(--text-muted)' }}>KDV Tutarı: <strong>₺{fmt(kdvTutar)}</strong></span>
+                            </div>
+                            {/* Tevkifat seçici */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-muted)', minWidth: '80px' }}>Tevkifat:</span>
+                              {[
+                                { label: 'Yok', val: 0 },
+                                { label: '2/10', val: 2/10 },
+                                { label: '3/10', val: 3/10 },
+                                { label: '4/10', val: 4/10 },
+                                { label: '5/10', val: 5/10 },
+                                { label: '7/10', val: 7/10 },
+                                { label: '9/10', val: 9/10 },
+                              ].map(opt => (
+                                <button key={opt.label} type="button"
+                                  onClick={() => { const ni = [...newInvoice.items]; ni[idx].tevkifat_rate = opt.val; setNewInvoice({...newInvoice, items: ni}); }}
+                                  style={{ padding: '0.25rem 0.65rem', borderRadius: '7px', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', border: '1.5px solid', background: item.tevkifat_rate === opt.val ? '#f59e0b' : 'transparent', color: item.tevkifat_rate === opt.val ? 'white' : 'var(--text-muted)', borderColor: item.tevkifat_rate === opt.val ? '#f59e0b' : 'var(--border)' }}
+                                >{opt.label}</button>
+                              ))}
+                              <span style={{ marginLeft: 'auto', fontSize: '0.82rem', color: 'var(--text-muted)' }}>Tevkifat Tutarı: <strong style={{ color: '#f59e0b' }}>₺{fmt(tevkTutar)}</strong></span>
+                            </div>
+                            {/* Ödenecek */}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
+                              <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-muted)' }}>Matrah: ₺{fmt(matrah)}&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+                              <span style={{ fontSize: '0.95rem', fontWeight: '800', color: 'var(--primary)' }}>Ödenecek: ₺{fmt(odenecek)}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -268,18 +298,33 @@ const Invoices = ({ initialView = 'list' }) => {
                 <InputGroup label="Açıklama" placeholder="Not ekleyin..." value={newInvoice.description} onChange={(e) => setNewInvoice({...newInvoice, description: e.target.value})} />
                 
                 <div style={{ marginTop: '1rem', padding: '1.5rem', background: 'var(--bg-main)', borderRadius: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span className="text-dim">Ara Toplam</span>
-                    <span style={{ fontWeight: '600' }}>₺{newInvoice.items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_price)), 0).toLocaleString('tr-TR', {maximumFractionDigits:2})}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span className="text-dim">KDV Toplam</span>
-                    <span style={{ fontWeight: '600' }}>₺{newInvoice.items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_price) * item.vat_rate / 100), 0).toLocaleString('tr-TR', {maximumFractionDigits:2})}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', paddingTop: '1rem', borderTop: '2px solid var(--border)' }}>
-                    <span style={{ fontWeight: '700' }}>Genel Toplam</span>
-                    <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '1.25rem' }}>₺{newInvoice.items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_price) * (1 + item.vat_rate / 100)), 0).toLocaleString('tr-TR', {maximumFractionDigits:2})}</span>
-                  </div>
+                  {(() => {
+                    const fmt = (n) => n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const matrahTop  = newInvoice.items.reduce((a, it) => a + Number(it.quantity)*Number(it.unit_price), 0);
+                    const kdvTop     = newInvoice.items.reduce((a, it) => a + Number(it.quantity)*Number(it.unit_price)*it.vat_rate/100, 0);
+                    const tevkTop    = newInvoice.items.reduce((a, it) => a + Number(it.quantity)*Number(it.unit_price)*it.vat_rate/100*it.tevkifat_rate, 0);
+                    const odenecek   = matrahTop + tevkTop;
+                    return (<>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span className="text-dim">Matrah</span>
+                        <span style={{ fontWeight: '600' }}>₺{fmt(matrahTop)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span className="text-dim">KDV Toplam</span>
+                        <span style={{ fontWeight: '600' }}>₺{fmt(kdvTop)}</span>
+                      </div>
+                      {tevkTop > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span className="text-dim">Tevkifat</span>
+                          <span style={{ fontWeight: '600', color: '#f59e0b' }}>₺{fmt(tevkTop)}</span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', paddingTop: '1rem', borderTop: '2px solid var(--border)' }}>
+                        <span style={{ fontWeight: '700' }}>Ödenecek Toplam</span>
+                        <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '1.25rem' }}>₺{fmt(odenecek)}</span>
+                      </div>
+                    </>);
+                  })()}
                 </div>
 
                 <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={handleSaveInvoice}><Save size={20} /> Faturayı Kaydet ve Bitir</button>
