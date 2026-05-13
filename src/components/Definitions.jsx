@@ -3,7 +3,7 @@ import {
   Plus, Search, Trash2, Edit2, ChevronRight,
   Package, Wallet, X, Shield, Users, FolderOpen,
   Eye, EyeOff, Pencil, CheckSquare, Square,
-  DollarSign, Upload, FileSpreadsheet, Tag,
+  DollarSign, Upload, FileSpreadsheet, Tag, TrendingUp,
 } from 'lucide-react';
 // xlsx dinamik import — yalnızca kullanıldığında yüklenir
 const getXLSX = () => import('xlsx');
@@ -169,6 +169,7 @@ const Definitions = () => {
     setDrillCat(null);
     setSearch('');
     if (activeTab === 'gider')              { fetchMaterials('Gider'); fetchAccountCards(); }
+    else if (activeTab === 'gelir')         fetchMaterials('Gelir');
     else if (activeTab === 'malzeme')       fetchMaterials('Malzeme');
     else if (activeTab === 'kasalar')       fetchKasalar();
     else if (activeTab === 'users')         { fetchUsers(); fetchRoles(); }
@@ -197,8 +198,9 @@ const Definitions = () => {
     if (error) { alert(error.message); return; }
     setShowMatModal(false);
     setEditMaterial(null);
-    setMatForm({ name: '', account_card: '', category: 'Diğer', unit: 'Adet', item_type: activeTab === 'gider' ? 'Gider' : 'Malzeme' });
-    fetchMaterials(activeTab === 'gider' ? 'Gider' : 'Malzeme');
+    const itemType = activeTab === 'gider' ? 'Gider' : activeTab === 'gelir' ? 'Gelir' : 'Malzeme';
+    setMatForm({ name: '', account_card: '', category: 'Diğer', unit: 'Adet', item_type: itemType });
+    fetchMaterials(itemType);
   };
 
   const handleEditMaterial = (m) => {
@@ -418,13 +420,9 @@ const Definitions = () => {
   // ─── Header button ───────────────────────────────────────────────────────────
   // ─── Header button (Global & Serbest Kayıt) ───
   const handleAddClick = () => {
-    if (activeTab === 'gider' || activeTab === 'malzeme') {
-      const isGider = activeTab === 'gider';
-      setMatForm({
-        name: '', unit: 'Adet', 
-        item_type: isGider ? 'Gider' : 'Malzeme',
-        account_card: '', category: '',
-      });
+    if (activeTab === 'gider' || activeTab === 'gelir' || activeTab === 'malzeme') {
+      const itemType = activeTab === 'gider' ? 'Gider' : activeTab === 'gelir' ? 'Gelir' : 'Malzeme';
+      setMatForm({ name: '', unit: 'Adet', item_type: itemType, account_card: '', category: '' });
       setShowMatModal(true);
     } else if (activeTab === 'kasalar') {
       setKasaForm({ name: '', type: 'Kasa' });
@@ -449,18 +447,18 @@ const Definitions = () => {
 
   // ─── Grid/Contextual button (Klasör İçinden Hızlı Kayıt) ───
   const handleOpenAddModal = () => {
+    const isGiderOrGelir = activeTab === 'gider' || activeTab === 'gelir';
+    const itemType = activeTab === 'gider' ? 'Gider' : activeTab === 'gelir' ? 'Gelir' : 'Malzeme';
     setMatForm({
-      name: '', 
-      unit: 'Adet', 
-      item_type: activeTab === 'gider' ? 'Gider' : 'Malzeme',
-      account_card: (activeTab === 'gider' ? drillCard : '') || '',
-      category: (activeTab === 'gider' ? drillCat : drillCard) || '',
+      name: '', unit: 'Adet', item_type: itemType,
+      account_card: isGiderOrGelir ? (drillCard || '') : '',
+      category:     isGiderOrGelir ? (drillCat  || '') : (drillCard || ''),
     });
     setShowMatModal(true);
   };
 
   const ADD_LABELS = {
-    gider: 'Yeni Gider Kartı', malzeme: 'Yeni Malzeme',
+    gider: 'Yeni Gider Kalemi', gelir: 'Yeni Gelir Kalemi', malzeme: 'Yeni Malzeme',
     kasalar: 'Yeni Kasa Ekle', users: 'Yeni Kullanıcı',
     roles: 'Yeni Rol', doc_cats: 'Yeni Kategori',
     hesap_kartlari: 'Yeni Hesap Kartı',
@@ -471,7 +469,7 @@ const Definitions = () => {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   const addButtonLabel = ADD_LABELS[activeTab] || 'YENİ EKLE';
-  const showBulkAdd    = (activeTab === 'malzeme' || activeTab === 'gider') && !!drillCard;
+  const showBulkAdd    = (activeTab === 'malzeme' || activeTab === 'gider' || activeTab === 'gelir') && !!drillCard;
 
   return (
     <div className="definitions-container">
@@ -481,7 +479,7 @@ const Definitions = () => {
           <p className="text-muted">Kartlar, kasalar, kullanıcılar, roller ve doküman kategorilerini yönetin.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          {!(activeTab === 'gider' || activeTab === 'malzeme') && (
+          {!(activeTab === 'gider' || activeTab === 'gelir' || activeTab === 'malzeme') && (
             <button className="btn btn-primary" onClick={handleAddClick}>
               <Plus size={18} /> {addButtonLabel}
             </button>
@@ -493,9 +491,10 @@ const Definitions = () => {
         {/* Sidebar */}
         <div style={{ width: '260px', flexShrink: 0 }}>
           <div className="card" style={{ padding: '0.75rem' }}>
-            <TabBtn active={activeTab==='gider'}          onClick={()=>setActiveTab('gider')}          icon={<DollarSign size={18}/>} label="Gider Kartları" />
-            <TabBtn active={activeTab==='malzeme'}        onClick={()=>setActiveTab('malzeme')}        icon={<Package size={18}/>}    label="Malzeme Kartları" />
-            <TabBtn active={activeTab==='hesap_kartlari'} onClick={()=>setActiveTab('hesap_kartlari')} icon={<Tag size={18}/>}        label="Hesap Kartları" />
+            <TabBtn active={activeTab==='gider'}          onClick={()=>setActiveTab('gider')}          icon={<DollarSign size={18}/>}  label="Gider Kartları" />
+            <TabBtn active={activeTab==='gelir'}          onClick={()=>setActiveTab('gelir')}          icon={<TrendingUp size={18}/>}  label="Gelir Kartları" />
+            <TabBtn active={activeTab==='malzeme'}        onClick={()=>setActiveTab('malzeme')}        icon={<Package size={18}/>}     label="Malzeme Kartları" />
+            <TabBtn active={activeTab==='hesap_kartlari'} onClick={()=>setActiveTab('hesap_kartlari')} icon={<Tag size={18}/>}         label="Hesap Kartları" />
             <TabBtn active={activeTab==='kasalar'}        onClick={()=>setActiveTab('kasalar')}        icon={<Wallet size={18}/>}     label="Kasalar & Hesaplar" />
             <TabBtn active={activeTab==='doc_cats'} onClick={()=>setActiveTab('doc_cats')} icon={<FolderOpen size={18}/>} label="Doküman Kategorileri" />
             <div style={{ height: '1px', background: 'var(--border)', margin: '0.5rem 0' }} />
@@ -509,23 +508,18 @@ const Definitions = () => {
           <div className="card">
 
             {/* ── GİDER & MALZEME — Hiyerarşik Drill-down ── */}
-            {(activeTab === 'gider' || activeTab === 'malzeme') && (() => {
-              const isGiderLevel = activeTab === 'gider';
-              const isGider      = isGiderLevel;
-              const dbGiderCards = accountCards.filter(c => c.card_type === 'Gider');
-              const topCards = isGiderLevel
-                ? (dbGiderCards.length > 0 ? dbGiderCards.map(c => c.name) : GIDER_CARDS)
-                : MALZEME_CATS;
-              const getCardMeta = (name) => {
-                const db = accountCards.find(c => c.name === name);
-                if (db) return { color: db.color, bg: db.color + '18', emoji: db.emoji };
-                return CARD_META[name] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
-              };
+            {(activeTab === 'gider' || activeTab === 'gelir' || activeTab === 'malzeme') && (() => {
+              const isGider      = activeTab === 'gider';
+              const isGelir      = activeTab === 'gelir';
+              const isGiderLevel = isGider || isGelir; // 2-seviyeli drill-down
+              const topCards     = isGider ? GIDER_CARDS : isGelir ? GELIR_CARDS : MALZEME_CATS;
+              const digerLabel   = isGider ? 'Diğer Giderler' : isGelir ? 'Diğer Gelirler' : 'Diğer';
+              const getCardMeta  = (name) => CARD_META[name] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
 
               const level2List = materials.filter(m => {
                 if (!drillCard) return false;
                 if (isGiderLevel) {
-                  const matchCard = m.account_card === drillCard || (!m.account_card && drillCard === 'Diğer Giderler');
+                  const matchCard = m.account_card === drillCard || (!m.account_card && drillCard === digerLabel);
                   if (!matchCard) return false;
                   if (drillCat) return m.category === drillCat;
                   return true;
@@ -538,7 +532,7 @@ const Definitions = () => {
               });
 
               const uniqueCatsUnderCard = drillCard && isGiderLevel
-                ? [...new Set(materials.filter(m => (m.account_card === drillCard || (!m.account_card && drillCard === 'Diğer Giderler')) && m.category).map(m => m.category))]
+                ? [...new Set(materials.filter(m => (m.account_card === drillCard || (!m.account_card && drillCard === digerLabel)) && m.category).map(m => m.category))]
                 : [];
 
               const showCategoryGrid  = isGiderLevel && drillCard && !drillCat;
@@ -559,7 +553,7 @@ const Definitions = () => {
                         fontWeight: '700', fontSize: '0.92rem',
                         color: drillCard ? 'var(--primary)' : 'var(--text)',
                         textDecoration: drillCard ? 'underline' : 'none', padding: 0 }}>
-                      {isGider ? 'Gider Kartları' : 'Malzeme Kartları'}
+                      {isGider ? 'Gider Kartları' : isGelir ? 'Gelir Kartları' : 'Malzeme Kartları'}
                     </button>
                     {drillCard && (
                       <>
@@ -926,34 +920,37 @@ const Definitions = () => {
       {/* Malzeme/Gider Modal — Stepped */}
       {showMatModal && (() => {
         const isGider    = activeTab === 'gider';
+        const isGelir    = activeTab === 'gelir';
+        const isGiderOrGelir = isGider || isGelir;
         // Düzenleme modunda adımlar kilitli değil; yeni eklemede context varsa kilitli
-        const cardLocked = !editMaterial && (isGider ? !!matForm.account_card : !!matForm.category);
-        const catLocked  = !editMaterial && isGider && !!matForm.category;
-        const currentContext = isGider ? matForm.account_card : matForm.category;
+        const cardLocked = !editMaterial && (isGiderOrGelir ? !!matForm.account_card : !!matForm.category);
+        const catLocked  = !editMaterial && isGiderOrGelir && !!matForm.category;
+        const currentContext = isGiderOrGelir ? matForm.account_card : matForm.category;
         const cardMeta   = CARD_META[currentContext] || {};
 
-        const step1Label = isGider ? 'Hesap Kartı' : 'Kategori';
-        const step1Value = isGider ? matForm.account_card : matForm.category;
-        const step1Locked = cardLocked;
-        const step1LockedVal = isGider ? matForm.account_card : matForm.category;
+        const step1Label    = isGiderOrGelir ? 'Hesap Kartı' : 'Kategori';
+        const step1LockedVal = isGiderOrGelir ? matForm.account_card : matForm.category;
+        const step1Locked   = cardLocked;
 
-        // Step 2 visible only for gider (category)
-        const step2Locked = catLocked;
+        // Step 2 visible only for gider/gelir (category)
+        const step2Locked    = catLocked;
         const step2LockedVal = matForm.category;
 
         // Final step number
-        const finalStepNum = isGider ? 3 : 2;
+        const finalStepNum = isGiderOrGelir ? 3 : 2;
 
         // Is final step enabled?
-        const step1Done = isGider ? !!matForm.account_card : !!matForm.category;
-        const step2Done = !isGider || !!matForm.category;
+        const step1Done    = isGiderOrGelir ? !!matForm.account_card : !!matForm.category;
+        const step2Done    = !isGiderOrGelir || !!matForm.category;
         const finalEnabled = step1Done && step2Done;
 
         return (
           <div style={overlay}>
             <div className="card" style={{ ...modal, maxWidth: '500px' }}>
               <ModalHeader
-                title={editMaterial ? (isGider ? 'Gider Kalemi Düzenle' : 'Malzeme Düzenle') : (isGider ? 'Yeni Gider Kalemi Ekle' : 'Yeni Malzeme Ekle')}
+                title={editMaterial
+                  ? (isGider ? 'Gider Kalemi Düzenle' : isGelir ? 'Gelir Kalemi Düzenle' : 'Malzeme Düzenle')
+                  : (isGider ? 'Yeni Gider Kalemi' : isGelir ? 'Yeni Gelir Kalemi' : 'Yeni Malzeme')}
                 onClose={() => { setShowMatModal(false); setEditMaterial(null); }}
               />
 
@@ -967,6 +964,12 @@ const Definitions = () => {
                       <option value="">Seçiniz...</option>
                       {GIDER_CARDS.map(c => <option key={c}>{c}</option>)}
                     </select>
+                  ) : isGelir ? (
+                    <select className="input" value={matForm.account_card}
+                      onChange={e => setMatForm({ ...matForm, account_card: e.target.value, category: '' })}>
+                      <option value="">Seçiniz...</option>
+                      {GELIR_CARDS.map(c => <option key={c}>{c}</option>)}
+                    </select>
                   ) : (
                     <select className="input" value={matForm.category}
                       onChange={e => setMatForm({ ...matForm, category: e.target.value })}>
@@ -978,8 +981,8 @@ const Definitions = () => {
 
                 <StepConnector active={step1Done} />
 
-                {/* ADIM 2 — sadece Gider */}
-                {isGider && (
+                {/* ADIM 2 — Gider veya Gelir */}
+                {isGiderOrGelir && (
                   <>
                     <StepRow num={2} label="Kategori" locked={step2Locked} lockedVal={step2LockedVal}
                       disabled={!matForm.account_card && !drillCard}>
