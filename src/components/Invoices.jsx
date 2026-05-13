@@ -1,16 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Plus,
-  MoreVertical,
-  ArrowLeft,
-  Save,
-  Trash2,
-  Building2,
-  Truck,
-  Warehouse,
+  Plus, MoreVertical, ArrowLeft, Save, Trash2,
+  Building2, Truck, Warehouse, ChevronRight,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
+
+const GIDER_CARDS = ['Araç ve İş Makinesi Giderleri', 'Akaryakıt Giderleri', 'Büro Malzemesi Giderleri', 'Yemek ve Gıda Giderleri', 'Tesis Giderleri', 'Personel Giderleri', 'Diğer Giderler'];
+const GELIR_CARDS = ['Hakediş Geliri', 'Ürün Satış Geliri', 'Hizmet Satış Geliri', 'Diğer Gelirler'];
 
 const Invoices = ({ initialView = 'list' }) => {
   const currentUser = useAuthStore(s => s.currentUser);
@@ -409,18 +406,22 @@ const Invoices = ({ initialView = 'list' }) => {
                 const err = itemErrors[idx] || {};
                 return (
                   <div key={item.id} style={{ padding: '1.5rem', background: 'var(--bg-main)', borderRadius: '12px', border: `1px solid ${Object.values(err).some(v=>v) ? '#ef4444' : 'var(--border)'}` }}>
-                    <div className="grid grid-cols-4" style={{ gap: '1rem', marginBottom: '1rem' }}>
-                      <div className="col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label className="label-sm">Ürün / Hizmet (Gider Kartı)</label>
-                        <MaterialSelect
-                          value={item.material_id}
-                          materials={materials}
-                          hasError={!!err.material_id}
-                          invoiceType={newInvoice.islem_turu}
-                          onChange={(id) => { const ni = [...newInvoice.items]; ni[idx].material_id = id; setNewInvoice({...newInvoice, items: ni}); }}
-                        />
-                        {err.material_id && <span style={{ fontSize: '0.75rem', color: '#ef4444' }}>{err.material_id}</span>}
-                      </div>
+
+                    {/* Satır 1: Hiyerarşik ürün seçimi */}
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label className="label-sm" style={{ marginBottom: '0.4rem', display: 'block' }}>Ürün / Hizmet Seçimi *</label>
+                      <SteppedSelect
+                        value={item.material_id}
+                        materials={materials}
+                        hasError={!!err.material_id}
+                        invoiceType={newInvoice.islem_turu}
+                        onChange={(id) => { const ni = [...newInvoice.items]; ni[idx].material_id = id; setNewInvoice({...newInvoice, items: ni}); }}
+                      />
+                      {err.material_id && <span style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '4px', display: 'block' }}>{err.material_id}</span>}
+                    </div>
+
+                    {/* Satır 2: Miktar + Birim Fiyat + Açıklama */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '120px 160px 1fr', gap: '1rem', marginBottom: '1rem', alignItems: 'flex-start' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label className="label-sm">Miktar</label>
                         <input type="number" className="input" value={item.quantity}
@@ -435,18 +436,12 @@ const Invoices = ({ initialView = 'list' }) => {
                           onChange={(e) => { const ni = [...newInvoice.items]; ni[idx].unit_price = e.target.value; setNewInvoice({...newInvoice, items: ni}); }} />
                         {err.unit_price && <span style={{ fontSize: '0.75rem', color: '#ef4444' }}>{err.unit_price}</span>}
                       </div>
-                    </div>
-
-                    {/* Açıklama */}
-                    <div style={{ marginBottom: '1rem' }}>
-                      <label className="label-sm">İşlem Açıklaması</label>
-                      <input
-                        className="input"
-                        placeholder="Bu kalem için açıklama girin (opsiyonel)..."
-                        value={item.description || ''}
-                        onChange={(e) => { const ni = [...newInvoice.items]; ni[idx].description = e.target.value; setNewInvoice({...newInvoice, items: ni}); }}
-                        style={{ marginTop: '0.4rem' }}
-                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <label className="label-sm">İşlem Açıklaması</label>
+                        <input className="input" placeholder="Opsiyonel açıklama..."
+                          value={item.description || ''}
+                          onChange={(e) => { const ni = [...newInvoice.items]; ni[idx].description = e.target.value; setNewInvoice({...newInvoice, items: ni}); }} />
+                      </div>
                     </div>
 
                     <div style={{ background: 'white', borderRadius: '10px', padding: '1rem', marginBottom: '0.75rem', border: '1px solid var(--border)' }}>
@@ -700,116 +695,80 @@ const InputGroup = ({ label, placeholder, type, value, onChange }) => (
   </div>
 );
 
-const MaterialSelect = ({ value, materials, onChange, hasError, invoiceType }) => {
-  const [query, setQuery]   = useState('');
-  const [open, setOpen]     = useState(false);
-  const [filterCard, setFilterCard] = useState('');
-  const [filterCat, setFilterCat]   = useState('');
-  const ref                 = useRef(null);
+const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) => {
+  const topCards = invoiceType === 'Alış Faturası' ? GIDER_CARDS : GELIR_CARDS;
 
-  const selected  = materials.find(m => m.id === value);
-  
-  // Önce fatura tipine göre (Alış -> Gider, Satış -> Gelir) filtrele
-  let filtered = materials.filter(m => {
-    if (invoiceType === 'Alış Faturası') return m.item_type === 'Gider';
-    if (invoiceType === 'Satış Faturası') return m.item_type === 'Gelir' || m.item_type === 'Malzeme';
-    return true;
+  // Fatura tipine göre ön filtre
+  const typeFiltered = materials.filter(m =>
+    invoiceType === 'Alış Faturası' ? m.item_type === 'Gider' : m.item_type !== 'Gider'
+  );
+
+  // account_card yoksa bile seçilebilir olsun — null/boş olanlar "Diğer" grubuna girer
+  const validCards = topCards.filter(c => typeFiltered.some(m => m.account_card === c));
+
+  const selectedMat = materials.find(m => m.id === value);
+  const [selCard, setSelCard] = useState(selectedMat?.account_card || '');
+  const [selCat,  setSelCat]  = useState(selectedMat?.category    || '');
+
+  // Fatura tipi değişince seçimleri sıfırla
+  useEffect(() => { setSelCard(''); setSelCat(''); }, [invoiceType]);
+
+  // Seçilen karta ait kategoriler
+  const availableCats = selCard
+    ? [...new Set(typeFiltered.filter(m => m.account_card === selCard).map(m => m.category).filter(Boolean))]
+    : [];
+
+  // Seçilen kart + kategoriye ait malzemeler
+  const availableMats = selCard && selCat
+    ? typeFiltered.filter(m => m.account_card === selCard && m.category === selCat)
+    : [];
+
+  const handleCard = (c) => { setSelCard(c); setSelCat(''); onChange(''); };
+  const handleCat  = (c) => { setSelCat(c);  onChange(''); };
+
+  const selStyle = (active) => ({
+    fontSize: '0.82rem',
+    borderColor: active ? 'var(--primary)' : undefined,
+    background: active ? 'var(--primary-light)' : undefined,
+    fontWeight: active ? '600' : undefined,
   });
 
-  // Sonra seçilen Kart ve Kategoriye göre filtrele
-  if (filterCard) filtered = filtered.filter(m => m.account_card === filterCard);
-  if (filterCat)  filtered = filtered.filter(m => m.category === filterCat);
-  
-  if (query.trim()) {
-    filtered = filtered.filter(m => m.name.toLowerCase().includes(query.toLowerCase()));
-  }
-
-  const cards = [...new Set(materials.map(m => m.account_card).filter(Boolean))];
-  const cats  = [...new Set(materials.map(m => m.category).filter(Boolean))];
-
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const handleSelect = (m) => {
-    onChange(m.id);
-    setQuery('');
-    setOpen(false);
-  };
-
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <div
-        className="input"
-        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'text', padding: '0', minHeight: '42px', ...(hasError ? { borderColor: '#ef4444' } : {}) }}
-        onClick={() => setOpen(true)}
-      >
-        <div style={{ flex: 1, padding: '0.6rem 0.85rem' }}>
-          {selected ? (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>{selected.name}</span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{selected.account_card} / {selected.category}</span>
-            </div>
-          ) : (
-            <span style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>Ürün / Hizmet Seçiniz...</span>
-          )}
-        </div>
-        <span style={{ paddingRight: '0.75rem', color: 'var(--text-dim)', fontSize: '0.75rem' }}>▼</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+      {/* Adım 1 — Hesap Kartı */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>1 · Hesap Kartı</span>
+        <select className="input" style={selStyle(!!selCard)} value={selCard} onChange={e => handleCard(e.target.value)}>
+          <option value="">Seçiniz...</option>
+          {topCards.map(c => (
+            <option key={c} value={c} disabled={!validCards.includes(c)}>
+              {c}{!validCards.includes(c) ? ' (boş)' : ''}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
-          background: 'white', border: '1px solid var(--border)', borderRadius: '12px',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.15)', minWidth: '400px', overflow: 'hidden'
-        }}>
-          {/* Hızlı Filtre Barı */}
-          <div style={{ padding: '0.75rem', background: 'var(--bg-main)', borderBottom: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-            <select className="input-sm" value={filterCard} onChange={e => setFilterCard(e.target.value)} style={{ fontSize: '0.75rem' }}>
-              <option value="">Tüm Kartlar</option>
-              {cards.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select className="input-sm" value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ fontSize: '0.75rem' }}>
-              <option value="">Tüm Kategoriler</option>
-              {cats.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <input 
-              autoFocus
-              className="input-sm"
-              placeholder="İsim ile ara..."
-              style={{ gridColumn: '1 / -1', fontSize: '0.75rem' }}
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-            />
-          </div>
+      <ChevronRight size={14} style={{ color: selCard ? 'var(--primary)' : 'var(--border)', flexShrink: 0, marginTop: '16px' }} />
 
-          <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
-            {filtered.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-                Kriterlere uygun sonuç bulunamadı.
-              </div>
-            ) : filtered.map(m => (
-              <div
-                key={m.id}
-                onMouseDown={() => handleSelect(m)}
-                style={{
-                  padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--bg-main)',
-                  background: m.id === value ? 'var(--primary-light)' : 'transparent'
-                }}
-                onMouseEnter={e => { if (m.id !== value) e.currentTarget.style.background = 'var(--bg-main)'; }}
-                onMouseLeave={e => { if (m.id !== value) e.currentTarget.style.background = 'transparent'; }}
-              >
-                <div style={{ fontWeight: '700', fontSize: '0.88rem', color: m.id === value ? 'var(--primary)' : 'var(--text)' }}>{m.name}</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>
-                  {m.account_card} <span style={{ opacity: 0.5 }}>•</span> {m.category}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Adım 2 — Kategori */}
+      <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <span style={{ fontSize: '0.68rem', fontWeight: '700', color: selCard ? 'var(--primary)' : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>2 · Kategori</span>
+        <select className="input" style={selStyle(!!selCat)} value={selCat} onChange={e => handleCat(e.target.value)} disabled={!selCard}>
+          <option value="">Seçiniz...</option>
+          {availableCats.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      <ChevronRight size={14} style={{ color: selCat ? 'var(--primary)' : 'var(--border)', flexShrink: 0, marginTop: '16px' }} />
+
+      {/* Adım 3 — Ürün/Hizmet */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <span style={{ fontSize: '0.68rem', fontWeight: '700', color: selCat ? 'var(--primary)' : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>3 · Ürün / Hizmet</span>
+        <select className="input" style={{ ...(hasError ? { borderColor: '#ef4444' } : selStyle(!!value)) }} value={value} onChange={e => onChange(e.target.value)} disabled={!selCat}>
+          <option value="">Seçiniz...</option>
+          {availableMats.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+      </div>
     </div>
   );
 };
