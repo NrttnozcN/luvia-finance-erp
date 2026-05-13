@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Plus,
   MoreVertical,
@@ -226,11 +226,11 @@ const Invoices = ({ initialView = 'list' }) => {
                     <div className="grid grid-cols-4" style={{ gap: '1rem', marginBottom: '1.25rem' }}>
                       <div className="col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label className="label-sm">Ürün / Hizmet (Gider Kartı)</label>
-                        <select className="input" value={item.material_id}
-                          onChange={(e) => { const ni = [...newInvoice.items]; ni[idx].material_id = e.target.value; setNewInvoice({...newInvoice, items: ni}); }}>
-                          <option value="">Seçiniz...</option>
-                          {materials.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
+                        <MaterialSelect
+                          value={item.material_id}
+                          materials={materials}
+                          onChange={(id) => { const ni = [...newInvoice.items]; ni[idx].material_id = id; setNewInvoice({...newInvoice, items: ni}); }}
+                        />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label className="label-sm">Miktar</label>
@@ -440,5 +440,82 @@ const InputGroup = ({ label, placeholder, type, value, onChange }) => (
     <input type={type || 'text'} className="input" placeholder={placeholder} value={value} onChange={onChange} />
   </div>
 );
+
+const MaterialSelect = ({ value, materials, onChange }) => {
+  const [query, setQuery]   = useState('');
+  const [open, setOpen]     = useState(false);
+  const ref                 = useRef(null);
+
+  const selected  = materials.find(m => m.id === value);
+  const filtered  = query.trim()
+    ? materials.filter(m => m.name.toLowerCase().includes(query.toLowerCase()))
+    : materials;
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleSelect = (m) => {
+    onChange(m.id);
+    setQuery('');
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div
+        className="input"
+        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'text', padding: '0' }}
+        onClick={() => setOpen(true)}
+      >
+        {open ? (
+          <input
+            autoFocus
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Ara..."
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', padding: '0.6rem 0.85rem', fontSize: '0.9rem', width: '100%' }}
+          />
+        ) : (
+          <span style={{ flex: 1, padding: '0.6rem 0.85rem', fontSize: '0.9rem', color: selected ? 'var(--text)' : 'var(--text-dim)' }}>
+            {selected ? selected.name : 'Seçiniz...'}
+          </span>
+        )}
+        <span style={{ paddingRight: '0.75rem', color: 'var(--text-dim)', fontSize: '0.75rem' }}>▼</span>
+      </div>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
+          background: 'white', border: '1px solid var(--border)', borderRadius: '10px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: '240px', overflowY: 'auto',
+        }}>
+          {filtered.length === 0 ? (
+            <div style={{ padding: '1rem', color: 'var(--text-dim)', fontSize: '0.85rem', textAlign: 'center' }}>Sonuç bulunamadı</div>
+          ) : filtered.map(m => (
+            <div
+              key={m.id}
+              onMouseDown={() => handleSelect(m)}
+              style={{
+                padding: '0.6rem 1rem', cursor: 'pointer', fontSize: '0.88rem',
+                background: m.id === value ? 'var(--primary-light)' : 'transparent',
+                color: m.id === value ? 'var(--primary)' : 'var(--text)',
+                fontWeight: m.id === value ? '700' : '400',
+                borderBottom: '1px solid var(--bg-main)',
+              }}
+              onMouseEnter={e => { if (m.id !== value) e.currentTarget.style.background = 'var(--bg-main)'; }}
+              onMouseLeave={e => { if (m.id !== value) e.currentTarget.style.background = 'transparent'; }}
+            >
+              {m.name}
+              {m.category && <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>{m.category}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default Invoices;
