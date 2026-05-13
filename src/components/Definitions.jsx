@@ -392,14 +392,31 @@ const Definitions = () => {
           <h1 style={{ fontSize: '2rem' }}>Sistem Tanımlamaları</h1>
           <p className="text-muted">Kartlar, kasalar, kullanıcılar, roller ve doküman kategorilerini yönetin.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexShrink: 0, zIndex: 9999 }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {/* Toplu Yükle Butonu */}
           {(activeTab === 'malzeme' || activeTab === 'gider') && drillCard && (
-            <button className="btn btn-ghost" onClick={() => setShowBulkModal(true)} style={{ color: 'var(--primary)', fontWeight: '700', whiteSpace: 'nowrap' }}>
+            <button className="btn btn-ghost" onClick={() => setShowBulkModal(true)} style={{ color: 'var(--primary)', fontWeight: '700' }}>
               📥 Toplu Yükle
             </button>
           )}
-          <button className="btn btn-primary" onClick={handleAddClick} style={{ minWidth: '160px', boxShadow: '0 4px 12px rgba(var(--primary-rgb), 0.3)', whiteSpace: 'nowrap' }}>
-            <Plus size={20} /> {ADD_LABELS[activeTab] || 'Yeni Ekle'}
+          
+          {/* YENİ EKLE BUTONU - SABİT VE GARANTİLİ KONUM */}
+          <button 
+            className="btn btn-primary" 
+            onClick={handleAddClick} 
+            style={{ 
+              position: 'fixed', 
+              top: '85px', 
+              right: '40px', 
+              zIndex: 99999, 
+              padding: '0.8rem 1.5rem',
+              boxShadow: '0 8px 25px rgba(249, 115, 22, 0.4)',
+              fontSize: '0.95rem',
+              fontWeight: '800',
+              border: '2px solid white'
+            }}
+          >
+            <Plus size={22} /> {ADD_LABELS[activeTab] || 'YENİ EKLE'}
           </button>
         </div>
       </header>
@@ -432,15 +449,14 @@ const Definitions = () => {
               // Malzeme: Level0=category, Level1=malzeme listesi
               const level2List = (() => {
                 if (isGider) {
-                  // Eğer drillCard 'Diğer Giderler' ise, account_card'ı null veya boş olanları da getir
-                  const base = drillCard 
-                    ? materials.filter(m => (m.account_card === drillCard) || (drillCard === 'Diğer Giderler' && !m.account_card)) 
+                  // Giderlerde; ya kartı eşleşenleri ya da kartı boş olup 'Diğer Giderler' klasörüne bakılanları getir
+                  return drillCard 
+                    ? materials.filter(m => (m.account_card === drillCard) || (!m.account_card && drillCard === 'Diğer Giderler')) 
                     : [];
-                  return drillCat ? base.filter(m => m.category === drillCat) : base;
                 }
-                // Malzemeler için de benzer mantık: Eğer 'Diğer' ise category'si boş olanları da göster
+                // Malzemelerde; kategori bazlı drill, kategori yoksa ve 'Diğer'e bakılıyorsa göster
                 return drillCard 
-                  ? materials.filter(m => (m.category === drillCard) || (drillCard === 'Diğer' && !m.category)) 
+                  ? materials.filter(m => (m.category === drillCard) || (!m.category && drillCard === 'Diğer')) 
                   : [];
               })();
 
