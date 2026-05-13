@@ -451,6 +451,7 @@ const Definitions = () => {
             {/* ── GİDER & MALZEME — Hiyerarşik Drill-down ── */}
             {(activeTab === 'gider' || activeTab === 'malzeme') && (() => {
               const isGiderLevel = activeTab === 'gider';
+              const isGider      = isGiderLevel;
               const topCards = isGiderLevel ? GIDER_CARDS : MALZEME_CATS;
 
               const level2List = materials.filter(m => {
