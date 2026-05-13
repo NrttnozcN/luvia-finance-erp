@@ -28,6 +28,14 @@ const Invoices = ({ initialView = 'list' }) => {
   const [detailItems, setDetailItems] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
   
+  // Filtre State'leri
+  const [filters, setFilters] = useState({
+    customer_id: '',
+    startDate: '',
+    endDate: '',
+    type: ''
+  });
+  
   const [newInvoice, setNewInvoice] = useState({
     invoice_no: '',
     customer_id: '',
@@ -40,10 +48,17 @@ const Invoices = ({ initialView = 'list' }) => {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: invs } = await supabase.from('invoices').select('*, customers(name)').eq('company_id', cid).order('created_at', { ascending: false });
-    const { data: custs } = await supabase.from('customers').select('*').eq('company_id', cid);
-    const { data: mats } = await supabase.from('materials').select('*').eq('company_id', cid);
-    const { data: vehs } = await supabase.from('vehicles').select('*').eq('company_id', cid);
+    let query = supabase.from('invoices').select('*, customers(name)').eq('company_id', cid).order('date', { ascending: false });
+
+    if (filters.customer_id) query = query.eq('customer_id', filters.customer_id);
+    if (filters.startDate)   query = query.gte('date', filters.startDate);
+    if (filters.endDate)     query = query.lte('date', filters.endDate);
+    if (filters.type)        query = query.eq('islem_turu', filters.type);
+
+    const { data: invs } = await query;
+    const { data: custs } = await supabase.from('customers').select('*').eq('company_id', cid).order('name');
+    const { data: mats } = await supabase.from('materials').select('*').eq('company_id', cid).order('name');
+    const { data: vehs } = await supabase.from('vehicles').select('*').eq('company_id', cid).order('plate');
     
     setInvoices(invs || []);
     setCustomers(custs || []);
@@ -54,7 +69,7 @@ const Invoices = ({ initialView = 'list' }) => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [filters]);
 
   const handleNewInvoice = () => {
     setNewInvoice({
@@ -556,14 +571,49 @@ const Invoices = ({ initialView = 'list' }) => {
         </button>
       </header>
 
+      {/* Filtre Paneli */}
+      <div className="card" style={{ marginBottom: '1.5rem', background: 'var(--bg-main)', border: '1.5px solid var(--border)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', alignItems: 'flex-end' }}>
+          <div>
+            <label className="label-sm" style={{ marginBottom: '0.4rem', display: 'block' }}>Cari Seçimi</label>
+            <select className="input" style={{ fontSize: '0.82rem' }} value={filters.customer_id} onChange={e => setFilters({...filters, customer_id: e.target.value})}>
+              <option value="">Tüm Cariler</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label-sm" style={{ marginBottom: '0.4rem', display: 'block' }}>Başlangıç</label>
+            <input type="date" className="input" style={{ fontSize: '0.82rem' }} value={filters.startDate} onChange={e => setFilters({...filters, startDate: e.target.value})} />
+          </div>
+          <div>
+            <label className="label-sm" style={{ marginBottom: '0.4rem', display: 'block' }}>Bitiş</label>
+            <input type="date" className="input" style={{ fontSize: '0.82rem' }} value={filters.endDate} onChange={e => setFilters({...filters, endDate: e.target.value})} />
+          </div>
+          <div>
+            <label className="label-sm" style={{ marginBottom: '0.4rem', display: 'block' }}>Tür</label>
+            <select className="input" style={{ fontSize: '0.82rem' }} value={filters.type} onChange={e => setFilters({...filters, type: e.target.value})}>
+              <option value="">Tümü</option>
+              <option value="Satış Faturası">Satış</option>
+              <option value="Alış Faturası">Alış</option>
+            </select>
+          </div>
+          <button className="btn btn-ghost" style={{ padding: '0.65rem', fontSize: '0.78rem', color: 'var(--danger)' }} 
+            onClick={() => setFilters({ customer_id: '', startDate: '', endDate: '', type: '' })}>
+            ❌ Filtreleri Temizle
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-4" style={{ marginBottom: '2.5rem' }}>
         <div className="card">
-          <p className="text-muted">Toplam Fatura</p>
+          <p className="text-muted">Bulunan Fatura</p>
           <h2 style={{ fontSize: '2rem' }}>{invoices.length}</h2>
         </div>
         <div className="card">
-          <p className="text-muted">Bu Ay İşlenen</p>
-          <h2 style={{ fontSize: '2rem', color: 'var(--primary)' }}>{invoices.filter(i => new Date(i.date).getMonth() === new Date().getMonth()).length}</h2>
+          <p className="text-muted">Toplam Tutar</p>
+          <h2 style={{ fontSize: '2rem', color: 'var(--primary)' }}>
+            ₺{invoices.reduce((sum, i) => sum + (i.islem_turu === 'Satış Faturası' ? i.total_amount : -i.total_amount), 0).toLocaleString()}
+          </h2>
         </div>
       </div>
 
