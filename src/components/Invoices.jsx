@@ -23,6 +23,7 @@ const Invoices = ({ initialView = 'list' }) => {
   const [customers, setCustomers] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [itemErrors, setItemErrors] = useState([]);
   
   const [newInvoice, setNewInvoice] = useState({
     invoice_no: '',
@@ -55,9 +56,10 @@ const Invoices = ({ initialView = 'list' }) => {
   const handleAddItem = () => {
     setNewInvoice({
       ...newInvoice,
-      items: [...newInvoice.items, { 
+      items: [...newInvoice.items, {
         id: Date.now(),
         material_id: '',
+        description: '',
         quantity: 1,
         unit_price: 0,
         vat_rate: 20,
@@ -80,6 +82,17 @@ const Invoices = ({ initialView = 'list' }) => {
       alert('Lütfen fatura no ve cari bilgisini doldurun.');
       return;
     }
+
+    // Kalem validasyonu
+    const errs = newInvoice.items.map(item => ({
+      material_id:   !item.material_id          ? 'Bu alanın doldurulması zorunludur.' : '',
+      quantity:      Number(item.quantity) <= 0  ? 'Bu alanın doldurulması zorunludur.' : '',
+      unit_price:    Number(item.unit_price) <= 0 ? 'Bu alanın doldurulması zorunludur.' : '',
+      allocation_id: item.allocation_type === 'Araç' && !item.allocation_id ? 'Bu alanın doldurulması zorunludur.' : '',
+    }));
+    const hasErr = errs.some(e => Object.values(e).some(v => v));
+    if (hasErr) { setItemErrors(errs); return; }
+    setItemErrors([]);
 
     const itemCalc = (item) => {
       const matrah = Number(item.quantity) * Number(item.unit_price);
@@ -112,6 +125,7 @@ const Invoices = ({ initialView = 'list' }) => {
     const itemsToInsert = newInvoice.items.map(item => ({
       invoice_id: invData[0].id,
       material_id: item.material_id,
+      description: item.description || null,
       quantity: item.quantity,
       unit_price: item.unit_price,
       vat_rate: item.vat_rate,
@@ -221,27 +235,46 @@ const Invoices = ({ initialView = 'list' }) => {
                 const kdvTutar  = matrah * item.vat_rate / 100;
                 const tevkTutar = kdvTutar * item.tevkifat_rate;
                 const odenecekItem = matrah + tevkTutar;
+                const err = itemErrors[idx] || {};
                 return (
-                  <div key={item.id} style={{ padding: '1.5rem', background: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                    <div className="grid grid-cols-4" style={{ gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div key={item.id} style={{ padding: '1.5rem', background: 'var(--bg-main)', borderRadius: '12px', border: `1px solid ${Object.values(err).some(v=>v) ? '#ef4444' : 'var(--border)'}` }}>
+                    <div className="grid grid-cols-4" style={{ gap: '1rem', marginBottom: '1rem' }}>
                       <div className="col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label className="label-sm">Ürün / Hizmet (Gider Kartı)</label>
                         <MaterialSelect
                           value={item.material_id}
                           materials={materials}
+                          hasError={!!err.material_id}
                           onChange={(id) => { const ni = [...newInvoice.items]; ni[idx].material_id = id; setNewInvoice({...newInvoice, items: ni}); }}
                         />
+                        {err.material_id && <span style={{ fontSize: '0.75rem', color: '#ef4444' }}>{err.material_id}</span>}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label className="label-sm">Miktar</label>
                         <input type="number" className="input" value={item.quantity}
+                          style={err.quantity ? { borderColor: '#ef4444' } : {}}
                           onChange={(e) => { const ni = [...newInvoice.items]; ni[idx].quantity = e.target.value; setNewInvoice({...newInvoice, items: ni}); }} />
+                        {err.quantity && <span style={{ fontSize: '0.75rem', color: '#ef4444' }}>{err.quantity}</span>}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label className="label-sm">Birim Fiyat (₺)</label>
                         <input type="number" className="input" value={item.unit_price}
+                          style={err.unit_price ? { borderColor: '#ef4444' } : {}}
                           onChange={(e) => { const ni = [...newInvoice.items]; ni[idx].unit_price = e.target.value; setNewInvoice({...newInvoice, items: ni}); }} />
+                        {err.unit_price && <span style={{ fontSize: '0.75rem', color: '#ef4444' }}>{err.unit_price}</span>}
                       </div>
+                    </div>
+
+                    {/* Açıklama */}
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label className="label-sm">İşlem Açıklaması</label>
+                      <input
+                        className="input"
+                        placeholder="Bu kalem için açıklama girin (opsiyonel)..."
+                        value={item.description || ''}
+                        onChange={(e) => { const ni = [...newInvoice.items]; ni[idx].description = e.target.value; setNewInvoice({...newInvoice, items: ni}); }}
+                        style={{ marginTop: '0.4rem' }}
+                      />
                     </div>
 
                     <div style={{ background: 'white', borderRadius: '10px', padding: '1rem', marginBottom: '0.75rem', border: '1px solid var(--border)' }}>
@@ -289,11 +322,15 @@ const Invoices = ({ initialView = 'list' }) => {
                           </button>
                         </div>
                         {item.allocation_type === 'Araç' && (
-                          <select className="input-sm" value={item.allocation_id}
-                            onChange={(e) => { const ni = [...newInvoice.items]; ni[idx].allocation_id = e.target.value; setNewInvoice({...newInvoice, items: ni}); }}>
-                            <option value="">Plaka Seçiniz...</option>
-                            {vehicles.map(v => <option key={v.id} value={v.id}>{v.plate}</option>)}
-                          </select>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <select className="input-sm" value={item.allocation_id}
+                              style={err.allocation_id ? { borderColor: '#ef4444' } : {}}
+                              onChange={(e) => { const ni = [...newInvoice.items]; ni[idx].allocation_id = e.target.value; setNewInvoice({...newInvoice, items: ni}); }}>
+                              <option value="">Plaka Seçiniz...</option>
+                              {vehicles.map(v => <option key={v.id} value={v.id}>{v.plate}</option>)}
+                            </select>
+                            {err.allocation_id && <span style={{ fontSize: '0.75rem', color: '#ef4444' }}>{err.allocation_id}</span>}
+                          </div>
                         )}
                       </div>
                       <button className="btn btn-ghost" style={{ color: 'var(--danger)' }}
@@ -441,7 +478,7 @@ const InputGroup = ({ label, placeholder, type, value, onChange }) => (
   </div>
 );
 
-const MaterialSelect = ({ value, materials, onChange }) => {
+const MaterialSelect = ({ value, materials, onChange, hasError }) => {
   const [query, setQuery]   = useState('');
   const [open, setOpen]     = useState(false);
   const ref                 = useRef(null);
@@ -467,7 +504,7 @@ const MaterialSelect = ({ value, materials, onChange }) => {
     <div ref={ref} style={{ position: 'relative' }}>
       <div
         className="input"
-        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'text', padding: '0' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'text', padding: '0', ...(hasError ? { borderColor: '#ef4444' } : {}) }}
         onClick={() => setOpen(true)}
       >
         {open ? (
