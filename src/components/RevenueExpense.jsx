@@ -6,13 +6,10 @@ import {
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
 
-const GIDER_CATS_FALLBACK = ['Araç ve İş Makinesi Giderleri','Akaryakıt Giderleri','Büro Malzemesi Giderleri','Yemek ve Gıda Giderleri','Tesis Giderleri','Personel Giderleri','Diğer Giderler'];
-const GELIR_CATS_FALLBACK  = ['Hakediş Geliri','Ürün Satış Geliri','Hizmet Satış Geliri','Diğer Gelirler'];
 
 const emptyForm = () => ({
   type: 'Gider (Çıkış)',
   facility_id: '',
-  account_card: '',
   category: '',
   material_id: '',
   amount: '',
@@ -32,9 +29,8 @@ const RevenueExpense = () => {
   const [newTransaction, setNewTransaction] = useState(emptyForm());
 
   // Lookup lists
-  const [facilities, setFacilities]         = useState([]);
-  const [accountCardsList, setAccountCardsList] = useState([]);
-  const [materialsList, setMaterialsList]   = useState([]);
+  const [facilities, setFacilities]       = useState([]);
+  const [materialsList, setMaterialsList] = useState([]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -46,12 +42,10 @@ const RevenueExpense = () => {
     ] = await Promise.all([
       supabase.from('finance_transactions').select('*').eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('facilities').select('id, name').eq('company_id', cid).order('name'),
-      supabase.from('account_cards').select('*').eq('company_id', cid).order('name'),
-      supabase.from('materials').select('id, name, account_card, category, item_type').eq('company_id', cid).order('name'),
+      supabase.from('materials').select('id, name, category').eq('company_id', cid).order('name'),
     ]);
     setTransactions(trans || []);
     setFacilities(facs || []);
-    setAccountCardsList(acCards || []);
     setMaterialsList(mats || []);
     setLoading(false);
   };
@@ -63,9 +57,8 @@ const RevenueExpense = () => {
     const { error } = await supabase.from('finance_transactions').insert([{
       type: newTransaction.type,
       facility_id: newTransaction.facility_id || null,
-      account_card: newTransaction.account_card || null,
       material_id: newTransaction.material_id || null,
-      category: newTransaction.account_card || 'Genel',
+      category: newTransaction.category || 'Genel',
       amount: Number(newTransaction.amount),
       description: newTransaction.description,
       date: newTransaction.date || null,
@@ -81,7 +74,7 @@ const RevenueExpense = () => {
     const { id, ...fields } = editRecord;
     const { error } = await supabase.from('finance_transactions').update({
       ...fields,
-      category: fields.account_card || fields.category || 'Genel',
+      category: fields.category || 'Genel',
       amount: Number(fields.amount),
     }).eq('id', id);
     if (error) { alert('Güncelleme hatası: ' + error.message); return; }
@@ -201,10 +194,7 @@ const RevenueExpense = () => {
           onSave={handleUpdate}
           saveLabel="Güncelle"
           facilities={facilities}
-          accountCardsList={accountCardsList}
           materialsList={materialsList}
-          giderFallback={GIDER_CATS_FALLBACK}
-          gelirFallback={GELIR_CATS_FALLBACK}
         />
       )}
 
@@ -218,10 +208,7 @@ const RevenueExpense = () => {
           onSave={handleSave}
           saveLabel="Kaydı Tamamla"
           facilities={facilities}
-          accountCardsList={accountCardsList}
           materialsList={materialsList}
-          giderFallback={GIDER_CATS_FALLBACK}
-          gelirFallback={GELIR_CATS_FALLBACK}
         />
       )}
     </div>
@@ -229,14 +216,9 @@ const RevenueExpense = () => {
 };
 
 // ─── Cascading Modal ─────────────────────────────────────────────────────────
-const TransactionModal = ({ title, form, setForm, onClose, onSave, saveLabel, facilities, accountCardsList, materialsList, giderFallback, gelirFallback }) => {
-  const isGider = form.type.includes('Gider') || form.type === 'Ödeme';
+const TransactionModal = ({ title, form, setForm, onClose, onSave, saveLabel, facilities, materialsList }) => {
 
-  const availableCards = accountCardsList.filter(c => isGider ? c.card_type === 'Gider' : c.card_type === 'Gelir');
-  const fallbackCards  = isGider ? giderFallback : gelirFallback;
-  const cardOptions    = availableCards.length > 0 ? availableCards.map(c => c.name) : fallbackCards;
-
-  // Kategori: tüm malzemelerin unique kategorileri (account_card eşleşmesi zorunlu değil)
+  // Kategori: tüm malzemelerin unique kategorileri
   const categoryOptions = [...new Set(
     materialsList.map(m => m.category).filter(Boolean)
   )].sort();
@@ -276,7 +258,7 @@ const TransactionModal = ({ title, form, setForm, onClose, onSave, saveLabel, fa
           <div>
             <label className="label-sm">TÜR</label>
             <select className="input" value={form.type}
-              onChange={e => setForm({ ...form, type: e.target.value, account_card: '', category: '', material_id: '' })}>
+              onChange={e => setForm({ ...form, type: e.target.value, category: '', material_id: '' })}>
               <option>Gider (Çıkış)</option>
               <option>Gelir (Giriş)</option>
             </select>
@@ -291,27 +273,17 @@ const TransactionModal = ({ title, form, setForm, onClose, onSave, saveLabel, fa
             </select>
           </Step>
 
-          {/* ADIM 2 — Hesap Kartı */}
-          <Step num={2} label="Hesap Kartı" done={!!form.account_card}>
-            <select className="input" value={form.account_card || ''}
-              onChange={e => setForm({ ...form, account_card: e.target.value, category: '', material_id: '' })}>
-              <option value="">Seçiniz...</option>
-              {cardOptions.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </Step>
-
-          {/* ADIM 3 — Kategori */}
-          <Step num={3} label="Kategori" done={!!form.category}>
-            <select className="input" value={form.category || ''} disabled={!form.account_card}
+          {/* ADIM 2 — Kategori */}
+          <Step num={2} label="Kategori" done={!!form.category}>
+            <select className="input" value={form.category || ''}
               onChange={e => setForm({ ...form, category: e.target.value, material_id: '' })}>
               <option value="">Seçiniz...</option>
               {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            {!form.account_card && <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>Önce hesap kartı seçin</p>}
           </Step>
 
-          {/* ADIM 4 — Malzeme/Hizmet */}
-          <Step num={4} label="Malzeme / Hizmet Adı" done={!!form.material_id}>
+          {/* ADIM 3 — Malzeme/Hizmet */}
+          <Step num={3} label="Malzeme / Hizmet Adı" done={!!form.material_id}>
             <select className="input" value={form.material_id || ''} disabled={!form.category}
               onChange={e => setForm({ ...form, material_id: e.target.value })}>
               <option value="">Seçiniz... (opsiyonel)</option>
