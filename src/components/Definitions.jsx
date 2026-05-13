@@ -404,29 +404,11 @@ const Definitions = () => {
           <p className="text-muted">Kartlar, kasalar, kullanıcılar, roller ve doküman kategorilerini yönetin.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          {showBulkAdd && (
-            <button className="btn btn-ghost" onClick={() => setShowBulkModal(true)} style={{ color: 'var(--primary)', fontWeight: '700' }}>
-              📥 Toplu Yükle
+          {!(activeTab === 'gider' || activeTab === 'malzeme') && (
+            <button className="btn btn-primary" onClick={handleAddClick}>
+              <Plus size={18} /> {addButtonLabel}
             </button>
           )}
-          
-          <button 
-            className="btn btn-primary" 
-            onClick={handleAddClick} 
-            style={{ 
-              position: 'fixed', 
-              top: '85px', 
-              right: '40px', 
-              zIndex: 99999, 
-              padding: '0.8rem 1.5rem',
-              boxShadow: '0 8px 25px rgba(249, 115, 22, 0.4)',
-              fontSize: '0.95rem',
-              fontWeight: '800',
-              border: '2px solid white'
-            }}
-          >
-            <Plus size={22} /> {addButtonLabel}
-          </button>
         </div>
       </header>
 
@@ -483,8 +465,9 @@ const Definitions = () => {
 
               return (
                 <>
-                  {/* Breadcrumb */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
+                  {/* Breadcrumb + Add Button */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button onClick={() => { setDrillCard(null); setDrillCat(null); setSearch(''); }}
                       style={{ background: 'none', border: 'none', cursor: drillCard ? 'pointer' : 'default',
                         fontWeight: '700', fontSize: '0.92rem',
@@ -510,6 +493,10 @@ const Definitions = () => {
                         <span style={{ fontWeight: '700', fontSize: '0.92rem' }}>{drillCat}</span>
                       </>
                     )}
+                  </div>
+                  <button className="btn btn-primary" onClick={handleAddClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                    <Plus size={16} /> {addButtonLabel}
+                  </button>
                   </div>
 
                   {loading && <p style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>Yükleniyor...</p>}
