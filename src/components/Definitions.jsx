@@ -143,7 +143,15 @@ const Definitions = () => {
     else if (activeTab === 'users')    { fetchUsers(); fetchRoles(); }
     else if (activeTab === 'roles')    { fetchRoles(); }
     else if (activeTab === 'doc_cats') fetchDocCats();
-  }, [activeTab]);
+    
+    console.log('Definitions - Active Tab:', activeTab, 'Company ID:', cid);
+  }, [activeTab, cid]);
+
+  useEffect(() => {
+    if (materials.length > 0) {
+      console.log('Definitions - Materials Loaded:', materials.length);
+    }
+  }, [materials]);
 
   // ─── Material CRUD ───────────────────────────────────────────────────────────
   const handleSaveMaterial = async () => {
@@ -385,6 +393,9 @@ const Definitions = () => {
   const filteredMaterials = materials.filter(m => m.name?.toLowerCase().includes(search.toLowerCase()));
 
   // ─── Render ──────────────────────────────────────────────────────────────────
+  const addButtonLabel = ADD_LABELS[activeTab] || 'YENİ EKLE';
+  const showBulkAdd    = (activeTab === 'malzeme' || activeTab === 'gider') && !!drillCard;
+
   return (
     <div className="definitions-container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
@@ -393,14 +404,12 @@ const Definitions = () => {
           <p className="text-muted">Kartlar, kasalar, kullanıcılar, roller ve doküman kategorilerini yönetin.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          {/* Toplu Yükle Butonu */}
-          {(activeTab === 'malzeme' || activeTab === 'gider') && drillCard && (
+          {showBulkAdd && (
             <button className="btn btn-ghost" onClick={() => setShowBulkModal(true)} style={{ color: 'var(--primary)', fontWeight: '700' }}>
               📥 Toplu Yükle
             </button>
           )}
           
-          {/* YENİ EKLE BUTONU - SABİT VE GARANTİLİ KONUM */}
           <button 
             className="btn btn-primary" 
             onClick={handleAddClick} 
@@ -416,7 +425,7 @@ const Definitions = () => {
               border: '2px solid white'
             }}
           >
-            <Plus size={22} /> {ADD_LABELS[activeTab] || 'YENİ EKLE'}
+            <Plus size={22} /> {addButtonLabel}
           </button>
         </div>
       </header>
@@ -441,31 +450,30 @@ const Definitions = () => {
 
             {/* ── GİDER & MALZEME — Hiyerarşik Drill-down ── */}
             {(activeTab === 'gider' || activeTab === 'malzeme') && (() => {
-              const isGider = activeTab === 'gider';
-              const topCards = isGider ? GIDER_CARDS : MALZEME_CATS;
+              const isGiderLevel = activeTab === 'gider';
+              const topCards = isGiderLevel ? GIDER_CARDS : MALZEME_CATS;
 
-              // --- Hesaplanan listeler ---
-              // Gider: Level0=account_card, Level1=category, Level2=malzeme listesi
-              // Malzeme: Level0=category, Level1=malzeme listesi
-              const level2List = (() => {
-                if (isGider) {
-                  // Giderlerde; ya kartı eşleşenleri ya da kartı boş olup 'Diğer Giderler' klasörüne bakılanları getir
-                  return drillCard 
-                    ? materials.filter(m => (m.account_card === drillCard) || (!m.account_card && drillCard === 'Diğer Giderler')) 
-                    : [];
+              const level2List = materials.filter(m => {
+                if (!drillCard) return false;
+                if (isGiderLevel) {
+                  const matchCard = m.account_card === drillCard || (!m.account_card && drillCard === 'Diğer Giderler');
+                  if (!matchCard) return false;
+                  if (drillCat) return m.category === drillCat;
+                  return true;
+                } else {
+                  if (drillCard === 'Diğer') {
+                    return !m.category || !MALZEME_CATS.includes(m.category) || m.category === 'Diğer';
+                  }
+                  return m.category === drillCard;
                 }
-                // Malzemelerde; kategori bazlı drill, kategori yoksa ve 'Diğer'e bakılıyorsa göster
-                return drillCard 
-                  ? materials.filter(m => (m.category === drillCard) || (!m.category && drillCard === 'Diğer')) 
-                  : [];
-              })();
+              });
 
-              const uniqueCatsUnderCard = drillCard && isGider
+              const uniqueCatsUnderCard = drillCard && isGiderLevel
                 ? [...new Set(materials.filter(m => (m.account_card === drillCard || (!m.account_card && drillCard === 'Diğer Giderler')) && m.category).map(m => m.category))]
                 : [];
 
-              const showCategoryGrid  = isGider && drillCard && !drillCat;
-              const showMaterialTable = isGider ? (drillCard && drillCat) : !!drillCard;
+              const showCategoryGrid  = isGiderLevel && drillCard && !drillCat;
+              const showMaterialTable = isGiderLevel ? (drillCard && drillCat) : !!drillCard;
               const showCardGrid      = !drillCard;
 
               const filtered = level2List.filter(m =>
@@ -512,8 +520,11 @@ const Definitions = () => {
 
                         const meta  = CARD_META[card] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
                         const count = materials.filter(m => {
-                          if (isGider) return m.account_card === card || (!m.account_card && card === 'Diğer Giderler');
-                          return m.category === card || (!m.category && card === 'Diğer');
+                          if (isGiderLevel) return m.account_card === card || (!m.account_card && card === 'Diğer Giderler');
+                          if (card === 'Diğer') {
+                            return !m.category || !MALZEME_CATS.includes(m.category) || m.category === 'Diğer';
+                          }
+                          return m.category === card;
                         }).length;
                         return (
                           <div key={card} onClick={() => { setDrillCard(card); setDrillCat(null); }}
