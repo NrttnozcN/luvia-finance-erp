@@ -98,7 +98,7 @@ const Invoices = ({ initialView = 'list' }) => {
       const matrah = Number(item.quantity) * Number(item.unit_price);
       const kdv    = matrah * item.vat_rate / 100;
       const tevk   = kdv * item.tevkifat_rate;
-      return matrah + tevk;
+      return matrah + kdv + tevk;
     };
     const total = newInvoice.items.reduce((acc, item) => acc + itemCalc(item), 0);
 
@@ -149,7 +149,7 @@ const Invoices = ({ initialView = 'list' }) => {
     const matrahTop = newInvoice.items.reduce((a, it) => a + Number(it.quantity) * Number(it.unit_price), 0);
     const kdvTop    = newInvoice.items.reduce((a, it) => a + Number(it.quantity) * Number(it.unit_price) * it.vat_rate / 100, 0);
     const tevkTop   = newInvoice.items.reduce((a, it) => a + Number(it.quantity) * Number(it.unit_price) * it.vat_rate / 100 * it.tevkifat_rate, 0);
-    const odenecek  = matrahTop + tevkTop;
+    const odenecek  = matrahTop + kdvTop + tevkTop;
 
     return (
       <div className="invoice-create" style={{ maxWidth: '1100px' }}>
@@ -231,10 +231,10 @@ const Invoices = ({ initialView = 'list' }) => {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {newInvoice.items.map((item, idx) => {
-                const matrah    = Number(item.quantity) * Number(item.unit_price);
-                const kdvTutar  = matrah * item.vat_rate / 100;
-                const tevkTutar = kdvTutar * item.tevkifat_rate;
-                const odenecekItem = matrah + tevkTutar;
+                const matrah      = Number(item.quantity) * Number(item.unit_price);
+                const kdvTutar    = matrah * item.vat_rate / 100;
+                const tevkTutar   = kdvTutar * item.tevkifat_rate;
+                const kdvDahil    = matrah + kdvTutar + tevkTutar;
                 const err = itemErrors[idx] || {};
                 return (
                   <div key={item.id} style={{ padding: '1.5rem', background: 'var(--bg-main)', borderRadius: '12px', border: `1px solid ${Object.values(err).some(v=>v) ? '#ef4444' : 'var(--border)'}` }}>
@@ -302,9 +302,21 @@ const Invoices = ({ initialView = 'list' }) => {
                         ))}
                         <span style={{ marginLeft: 'auto', fontSize: '0.82rem', color: 'var(--text-muted)' }}>Tevkifat: <strong style={{ color: '#f59e0b' }}>₺{fmt(tevkTutar)}</strong></span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.6rem', borderTop: '1px solid var(--border)', gap: '1.5rem' }}>
-                        <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: '600' }}>Matrah: ₺{fmt(matrah)}</span>
-                        <span style={{ fontSize: '0.95rem', fontWeight: '800', color: 'var(--primary)' }}>Kalem Toplam: ₺{fmt(odenecekItem)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.6rem', borderTop: '1px solid var(--border)', gap: '1.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                          KDV Hariç: <strong>₺{fmt(matrah)}</strong>
+                        </span>
+                        <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                          KDV: <strong>₺{fmt(kdvTutar)}</strong>
+                        </span>
+                        {tevkTutar > 0 && (
+                          <span style={{ fontSize: '0.88rem', color: '#f59e0b', fontWeight: '600' }}>
+                            Tevkifat: <strong>₺{fmt(tevkTutar)}</strong>
+                          </span>
+                        )}
+                        <span style={{ fontSize: '0.95rem', fontWeight: '800', color: 'var(--primary)', borderLeft: '2px solid var(--border)', paddingLeft: '1rem' }}>
+                          KDV Dahil: ₺{fmt(kdvDahil)}
+                        </span>
                       </div>
                     </div>
 
@@ -347,13 +359,13 @@ const Invoices = ({ initialView = 'list' }) => {
 
         {/* BÖLÜM 3: Özet + Kaydet */}
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, display: 'flex', gap: '2.5rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, display: 'flex', gap: '2.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <div>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '0.25rem', fontWeight: '600' }}>Matrah</p>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '0.25rem', fontWeight: '600' }}>KDV Hariç</p>
               <p style={{ fontWeight: '700', fontSize: '1.05rem' }}>₺{fmt(matrahTop)}</p>
             </div>
             <div>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '0.25rem', fontWeight: '600' }}>KDV Toplam</p>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '0.25rem', fontWeight: '600' }}>KDV Toplamı</p>
               <p style={{ fontWeight: '700', fontSize: '1.05rem' }}>₺{fmt(kdvTop)}</p>
             </div>
             {tevkTop > 0 && (
@@ -363,8 +375,9 @@ const Invoices = ({ initialView = 'list' }) => {
               </div>
             )}
             <div style={{ paddingLeft: '2rem', borderLeft: '2px solid var(--border)' }}>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '0.25rem', fontWeight: '600' }}>Ödenecek Toplam</p>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '0.25rem', fontWeight: '600' }}>Ödenecek Tutar</p>
               <p style={{ fontWeight: '800', fontSize: '1.5rem', color: 'var(--primary)' }}>₺{fmt(odenecek)}</p>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>KDV Hariç + KDV{tevkTop > 0 ? ' + Tevkifat' : ''}</p>
             </div>
           </div>
           <button className="btn btn-primary" style={{ padding: '0.9rem 2.5rem', fontSize: '1rem', fontWeight: '800', flexShrink: 0 }} onClick={handleSaveInvoice}>
