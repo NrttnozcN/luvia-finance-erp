@@ -16,6 +16,28 @@ const GELIR_CARDS   = ['Hakediş Geliri', 'Ürün Satış Geliri', 'Hizmet Satı
 const MALZEME_CATS  = ['Yedek Parça', 'Akaryakıt', 'Yağ & Filtre', 'Lastik', 'Büro Malzemesi', 'Gıda', 'Hizmet', 'Diğer'];
 const UNITS         = ['Adet', 'Litre', 'Kg', 'Saat', 'Metre', 'Kutu', 'Gün'];
 
+const CARD_META = {
+  'Araç ve İş Makinesi Giderleri': { color: '#3b82f6', bg: '#eff6ff',  emoji: '🚗' },
+  'Akaryakıt Giderleri':           { color: '#f97316', bg: '#fff7ed',  emoji: '⛽' },
+  'Büro Malzemesi Giderleri':      { color: '#8b5cf6', bg: '#f5f3ff',  emoji: '📎' },
+  'Yemek ve Gıda Giderleri':       { color: '#ec4899', bg: '#fdf2f8',  emoji: '🍽️' },
+  'Tesis Giderleri':               { color: '#06b6d4', bg: '#ecfeff',  emoji: '🏢' },
+  'Personel Giderleri':            { color: '#16a34a', bg: '#f0fdf4',  emoji: '👥' },
+  'Diğer Giderler':                { color: '#64748b', bg: '#f8fafc',  emoji: '📦' },
+  'Hakediş Geliri':                { color: '#16a34a', bg: '#f0fdf4',  emoji: '💰' },
+  'Ürün Satış Geliri':             { color: '#f59e0b', bg: '#fffbeb',  emoji: '🛒' },
+  'Hizmet Satış Geliri':           { color: '#3b82f6', bg: '#eff6ff',  emoji: '⚙️' },
+  'Diğer Gelirler':                { color: '#64748b', bg: '#f8fafc',  emoji: '📊' },
+  'Yedek Parça':   { color: '#3b82f6', bg: '#eff6ff', emoji: '🔧' },
+  'Akaryakıt':     { color: '#f97316', bg: '#fff7ed', emoji: '⛽' },
+  'Yağ & Filtre':  { color: '#8b5cf6', bg: '#f5f3ff', emoji: '🛢️' },
+  'Lastik':        { color: '#64748b', bg: '#f8fafc', emoji: '⭕' },
+  'Büro Malzemesi':{ color: '#06b6d4', bg: '#ecfeff', emoji: '📎' },
+  'Gıda':          { color: '#ec4899', bg: '#fdf2f8', emoji: '🥤' },
+  'Hizmet':        { color: '#16a34a', bg: '#f0fdf4', emoji: '⚙️' },
+  'Diğer':         { color: '#64748b', bg: '#f8fafc', emoji: '📦' },
+};
+
 const Definitions = () => {
   const currentUser = useAuthStore(s => s.currentUser);
   const cid = currentUser?.company_id;
@@ -23,6 +45,10 @@ const Definitions = () => {
   const [activeTab, setActiveTab] = useState('gider');
   const [loading, setLoading]     = useState(false);
   const [search, setSearch]       = useState('');
+
+  // Hiyerarşik navigasyon
+  const [drillCard, setDrillCard] = useState(null); // account_card (gider) veya category (malzeme)
+  const [drillCat,  setDrillCat]  = useState(null); // category (yalnızca gider 2. seviye)
 
   const [materials, setMaterials]         = useState([]);
   const [showMatModal, setShowMatModal]   = useState(false);
@@ -63,6 +89,7 @@ const Definitions = () => {
     const { data } = await supabase
       .from('materials')
       .select('*')
+      .eq('company_id', cid)
       .eq('item_type', type)
       .order('name');
     setMaterials(data || []);
@@ -107,6 +134,9 @@ const Definitions = () => {
   };
 
   useEffect(() => {
+    setDrillCard(null);
+    setDrillCat(null);
+    setSearch('');
     if (activeTab === 'gider')         fetchMaterials('Gider');
     else if (activeTab === 'malzeme')  fetchMaterials('Malzeme');
     else if (activeTab === 'kasalar')  fetchKasalar();
@@ -118,10 +148,10 @@ const Definitions = () => {
   // ─── Material CRUD ───────────────────────────────────────────────────────────
   const handleSaveMaterial = async () => {
     if (!matForm.name.trim()) { alert('Tanım adı zorunludur.'); return; }
-    const { error } = await supabase.from('materials').insert([{ ...matForm }]);
+    const { error } = await supabase.from('materials').insert([{ ...matForm, company_id: cid }]);
     if (error) { alert(error.message); return; }
     setShowMatModal(false);
-    setMatForm({ name: '', category: 'Diğer', unit: 'Adet', item_type: activeTab === 'gider' ? 'Gider' : 'Malzeme', account_card: '' });
+    setMatForm({ name: '', account_card: '', category: 'Diğer', unit: 'Adet', item_type: activeTab === 'gider' ? 'Gider' : 'Malzeme' });
     fetchMaterials(activeTab === 'gider' ? 'Gider' : 'Malzeme');
   };
 
@@ -308,10 +338,18 @@ const Definitions = () => {
   // ─── Header button ───────────────────────────────────────────────────────────
   const handleAddClick = () => {
     if (activeTab === 'gider') {
-      setMatForm({ name: '', category: 'Gider', unit: 'Adet', item_type: 'Gider' });
+      setMatForm({
+        name: '', unit: 'Adet', item_type: 'Gider',
+        account_card: drillCard || GIDER_CARDS[0],
+        category: drillCat || '',
+      });
       setShowMatModal(true);
     } else if (activeTab === 'malzeme') {
-      setMatForm({ name: '', category: 'Yedek Parça', unit: 'Adet', item_type: 'Malzeme' });
+      setMatForm({
+        name: '', unit: 'Adet', item_type: 'Malzeme',
+        account_card: '',
+        category: drillCard || MALZEME_CATS[0],
+      });
       setShowMatModal(true);
     } else if (activeTab === 'kasalar') {
       setShowKasaModal(true);
@@ -344,15 +382,17 @@ const Definitions = () => {
           <p className="text-muted">Kartlar, kasalar, kullanıcılar, roller ve doküman kategorilerini yönetin.</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          {(activeTab === 'malzeme' || activeTab === 'gider') && (
+          {(activeTab === 'malzeme' || activeTab === 'gider') && drillCard && (
             <button className="btn btn-ghost" onClick={() => setShowBulkModal(true)} style={{ color: 'var(--primary)', fontWeight: '700' }}>
               📥 Toplu Yükle
             </button>
           )}
           {ADD_LABELS[activeTab] && (
-            <button className="btn btn-primary" onClick={handleAddClick}>
-              <Plus size={20} /> {ADD_LABELS[activeTab]}
-            </button>
+            ((activeTab === 'gider' || activeTab === 'malzeme') ? drillCard : true) && (
+              <button className="btn btn-primary" onClick={handleAddClick}>
+                <Plus size={20} /> {ADD_LABELS[activeTab]}
+              </button>
+            )
           )}
         </div>
       </header>
@@ -375,50 +415,179 @@ const Definitions = () => {
         <div style={{ flex: 1 }}>
           <div className="card">
 
-            {/* ── GİDER & MALZEME ── */}
-            {(activeTab === 'gider' || activeTab === 'malzeme') && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                  <h2 style={{ fontSize: '1.25rem' }}>
-                    {activeTab === 'gider' ? 'Gider Kartları' : 'Malzeme Kartları'}
-                  </h2>
-                  <div className="search-box" style={{ width: '280px' }}>
-                    <Search size={16} className="text-dim" />
-                    <input type="text" placeholder="Ara..." value={search} onChange={e => setSearch(e.target.value)} />
+            {/* ── GİDER & MALZEME — Hiyerarşik Drill-down ── */}
+            {(activeTab === 'gider' || activeTab === 'malzeme') && (() => {
+              const isGider = activeTab === 'gider';
+              const topCards = isGider ? GIDER_CARDS : MALZEME_CATS;
+
+              // --- Hesaplanan listeler ---
+              // Gider: Level0=account_card, Level1=category, Level2=malzeme listesi
+              // Malzeme: Level0=category, Level1=malzeme listesi
+              const level2List = (() => {
+                if (isGider) {
+                  const base = drillCard ? materials.filter(m => m.account_card === drillCard) : [];
+                  return drillCat ? base.filter(m => m.category === drillCat) : [];
+                }
+                return drillCard ? materials.filter(m => m.category === drillCard) : [];
+              })();
+
+              const uniqueCatsUnderCard = drillCard && isGider
+                ? [...new Set(materials.filter(m => m.account_card === drillCard && m.category).map(m => m.category))]
+                : [];
+
+              const showCategoryGrid  = isGider && drillCard && !drillCat;
+              const showMaterialTable = isGider ? (drillCard && drillCat) : !!drillCard;
+              const showCardGrid      = !drillCard;
+
+              const filtered = level2List.filter(m =>
+                !search || m.name?.toLowerCase().includes(search.toLowerCase())
+              );
+
+              return (
+                <>
+                  {/* Breadcrumb */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
+                    <button onClick={() => { setDrillCard(null); setDrillCat(null); setSearch(''); }}
+                      style={{ background: 'none', border: 'none', cursor: drillCard ? 'pointer' : 'default',
+                        fontWeight: '700', fontSize: '0.92rem',
+                        color: drillCard ? 'var(--primary)' : 'var(--text)',
+                        textDecoration: drillCard ? 'underline' : 'none', padding: 0 }}>
+                      {isGider ? 'Gider Kartları' : 'Malzeme Kartları'}
+                    </button>
+                    {drillCard && (
+                      <>
+                        <ChevronRight size={14} style={{ color: 'var(--text-dim)' }} />
+                        <button onClick={() => { setDrillCat(null); setSearch(''); }}
+                          style={{ background: 'none', border: 'none', cursor: (isGider && drillCat) ? 'pointer' : 'default',
+                            fontWeight: '700', fontSize: '0.92rem',
+                            color: (isGider && drillCat) ? 'var(--primary)' : 'var(--text)',
+                            textDecoration: (isGider && drillCat) ? 'underline' : 'none', padding: 0 }}>
+                          {drillCard}
+                        </button>
+                      </>
+                    )}
+                    {drillCat && (
+                      <>
+                        <ChevronRight size={14} style={{ color: 'var(--text-dim)' }} />
+                        <span style={{ fontWeight: '700', fontSize: '0.92rem' }}>{drillCat}</span>
+                      </>
+                    )}
                   </div>
-                </div>
-                {loading ? <p style={{ textAlign: 'center', padding: '3rem' }}>Yükleniyor...</p> : (
-                  <table style={{ width: '100%' }}>
-                    <thead>
-                      <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
-                        <th style={{ paddingBottom: '1rem' }}>Tanım Adı</th>
-                        <th style={{ paddingBottom: '1rem' }}>Kategori</th>
-                        <th style={{ paddingBottom: '1rem' }}>Birim</th>
-                        <th style={{ paddingBottom: '1rem', textAlign: 'right' }}>İşlemler</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredMaterials.length === 0 ? (
-                        <tr><td colSpan="4" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>
-                          {activeTab === 'gider' ? 'Gider kartı bulunamadı.' : 'Malzeme kartı bulunamadı.'}
-                        </td></tr>
-                      ) : filteredMaterials.map(m => (
-                        <tr key={m.id} style={{ borderBottom: '1px solid var(--bg-main)' }}>
-                          <td style={{ padding: '0.9rem 0', fontWeight: '600' }}>{m.name}</td>
-                          <td><span className="badge badge-primary">{m.category}</span></td>
-                          <td className="text-dim" style={{ fontSize: '0.85rem' }}>{m.unit}</td>
-                          <td style={{ textAlign: 'right' }}>
-                            <button className="btn btn-ghost" style={{ padding: '0.4rem', color: 'var(--danger)' }} onClick={() => handleDeleteMaterial(m.id)}>
-                              <Trash2 size={15} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </>
-            )}
+
+                  {loading && <p style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>Yükleniyor...</p>}
+
+                  {/* Level 0 — Kart Grid */}
+                  {!loading && showCardGrid && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+                      {topCards.map(card => {
+                        const meta  = CARD_META[card] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
+                        const count = isGider
+                          ? materials.filter(m => m.account_card === card).length
+                          : materials.filter(m => m.category === card).length;
+                        return (
+                          <div key={card} onClick={() => { setDrillCard(card); setDrillCat(null); }}
+                            style={{ padding: '1.25rem', borderRadius: '14px', border: '1.5px solid', borderColor: meta.color + '33',
+                              background: meta.bg, cursor: 'pointer', transition: 'box-shadow 0.18s',
+                              display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+                            onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 16px ${meta.color}22`}
+                            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <span style={{ fontSize: '1.75rem', lineHeight: 1 }}>{meta.emoji}</span>
+                              <div style={{ flex: 1 }}>
+                                <p style={{ fontWeight: '700', fontSize: '0.85rem', color: meta.color, lineHeight: 1.3 }}>{card}</p>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.75rem', color: meta.color, fontWeight: '600',
+                                background: meta.color + '1a', padding: '0.2rem 0.6rem', borderRadius: '20px' }}>
+                                {count} kalem
+                              </span>
+                              <ChevronRight size={14} style={{ color: meta.color }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Level 1 — Kategori grid (yalnızca Gider) */}
+                  {!loading && showCategoryGrid && (
+                    <>
+                      {uniqueCatsUnderCard.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>
+                          <FolderOpen size={40} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                          <p>Bu hesap kartında henüz kalem yok.</p>
+                          <p style={{ fontSize: '0.82rem' }}>Yukarıdan "Yeni Gider Kartı" butonuyla ekleyin.</p>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
+                          {uniqueCatsUnderCard.map(cat => {
+                            const meta  = CARD_META[cat] || { color: '#64748b', bg: '#f8fafc', emoji: '📂' };
+                            const count = materials.filter(m => m.account_card === drillCard && m.category === cat).length;
+                            return (
+                              <div key={cat} onClick={() => setDrillCat(cat)}
+                                style={{ padding: '1.1rem', borderRadius: '12px', border: '1.5px solid', borderColor: meta.color + '33',
+                                  background: meta.bg, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', transition: 'box-shadow 0.18s' }}
+                                onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 14px ${meta.color}22`}
+                                onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
+                                <span style={{ fontSize: '1.4rem' }}>{meta.emoji}</span>
+                                <div style={{ flex: 1 }}>
+                                  <p style={{ fontWeight: '700', fontSize: '0.82rem', color: meta.color }}>{cat}</p>
+                                  <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>{count} kalem</p>
+                                </div>
+                                <ChevronRight size={13} style={{ color: meta.color, flexShrink: 0 }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Level 2 — Malzeme listesi */}
+                  {!loading && showMaterialTable && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                        <div className="search-box" style={{ width: '260px' }}>
+                          <Search size={15} className="text-dim" />
+                          <input type="text" placeholder="Ara..." value={search} onChange={e => setSearch(e.target.value)} />
+                        </div>
+                      </div>
+                      {filtered.length === 0 ? (
+                        <p style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>Bu kategoride kalem bulunamadı.</p>
+                      ) : (
+                        <table style={{ width: '100%' }}>
+                          <thead>
+                            <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
+                              <th style={{ paddingBottom: '1rem' }}>Tanım Adı</th>
+                              {isGider && <th style={{ paddingBottom: '1rem' }}>Hesap Kartı</th>}
+                              <th style={{ paddingBottom: '1rem' }}>Kategori</th>
+                              <th style={{ paddingBottom: '1rem' }}>Birim</th>
+                              <th style={{ paddingBottom: '1rem', textAlign: 'right' }}>İşlemler</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filtered.map(m => (
+                              <tr key={m.id} style={{ borderBottom: '1px solid var(--bg-main)' }}>
+                                <td style={{ padding: '0.9rem 0', fontWeight: '600' }}>{m.name}</td>
+                                {isGider && <td style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>{m.account_card || '—'}</td>}
+                                <td><span className="badge badge-primary">{m.category}</span></td>
+                                <td className="text-dim" style={{ fontSize: '0.85rem' }}>{m.unit}</td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <button className="btn btn-ghost" style={{ padding: '0.4rem', color: 'var(--danger)' }} onClick={() => handleDeleteMaterial(m.id)}>
+                                    <Trash2 size={15} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </>
+                  )}
+                </>
+              );
+            })()}
 
             {/* ── KASALAR ── */}
             {activeTab === 'kasalar' && (
@@ -600,10 +769,22 @@ const Definitions = () => {
               <Field label="Tanım Adı *">
                 <input className="input" placeholder="Örn: Motor Yağı 10W-40" value={matForm.name} onChange={e => setMatForm({ ...matForm, name: e.target.value })} />
               </Field>
+              {activeTab === 'gider' && (
+                <Field label="Hesap Kartı *">
+                  <select className="input" value={matForm.account_card} onChange={e => setMatForm({ ...matForm, account_card: e.target.value })}>
+                    <option value="">Seçiniz...</option>
+                    {GIDER_CARDS.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </Field>
+              )}
               <Field label="Kategori">
-                <select className="input" value={matForm.category} onChange={e => setMatForm({ ...matForm, category: e.target.value })}>
-                  {(activeTab === 'gider' ? GIDER_CATS : MALZEME_CATS).map(c => <option key={c}>{c}</option>)}
-                </select>
+                {activeTab === 'gider' ? (
+                  <input className="input" placeholder="Örn: Lastik, Yağ, Bakım..." value={matForm.category} onChange={e => setMatForm({ ...matForm, category: e.target.value })} />
+                ) : (
+                  <select className="input" value={matForm.category} onChange={e => setMatForm({ ...matForm, category: e.target.value })}>
+                    {MALZEME_CATS.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                )}
               </Field>
               <Field label="Birim">
                 <select className="input" value={matForm.unit} onChange={e => setMatForm({ ...matForm, unit: e.target.value })}>
