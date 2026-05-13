@@ -57,6 +57,7 @@ const Definitions = () => {
   const [bulkFileName, setBulkFileName]   = useState('');
   const fileInputRef                      = useRef(null);
   const [matForm, setMatForm]             = useState({ name: '', category: 'Gider', unit: 'Adet', item_type: 'Gider' });
+  const [editMaterial, setEditMaterial]   = useState(null);
 
   // ── Kasalar ──
   const [kasalar, setKasalar]           = useState([]);
@@ -156,11 +157,23 @@ const Definitions = () => {
   // ─── Material CRUD ───────────────────────────────────────────────────────────
   const handleSaveMaterial = async () => {
     if (!matForm.name.trim()) { alert('Tanım adı zorunludur.'); return; }
-    const { error } = await supabase.from('materials').insert([{ ...matForm, company_id: cid }]);
+    let error;
+    if (editMaterial) {
+      ({ error } = await supabase.from('materials').update({ ...matForm }).eq('id', editMaterial.id));
+    } else {
+      ({ error } = await supabase.from('materials').insert([{ ...matForm, company_id: cid }]));
+    }
     if (error) { alert(error.message); return; }
     setShowMatModal(false);
+    setEditMaterial(null);
     setMatForm({ name: '', account_card: '', category: 'Diğer', unit: 'Adet', item_type: activeTab === 'gider' ? 'Gider' : 'Malzeme' });
     fetchMaterials(activeTab === 'gider' ? 'Gider' : 'Malzeme');
+  };
+
+  const handleEditMaterial = (m) => {
+    setEditMaterial(m);
+    setMatForm({ name: m.name, unit: m.unit, item_type: m.item_type, account_card: m.account_card || '', category: m.category || '' });
+    setShowMatModal(true);
   };
 
   const handleExcelFile = async (e) => {
@@ -611,7 +624,10 @@ const Definitions = () => {
                                 {isGider && <td style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>{m.account_card || '—'}</td>}
                                 <td><span className="badge badge-primary">{m.category}</span></td>
                                 <td className="text-dim" style={{ fontSize: '0.85rem' }}>{m.unit}</td>
-                                <td style={{ textAlign: 'right' }}>
+                                <td style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '0.25rem', padding: '0.9rem 0' }}>
+                                  <button className="btn btn-ghost" style={{ padding: '0.4rem', color: 'var(--primary)' }} onClick={() => handleEditMaterial(m)}>
+                                    <Edit2 size={15} />
+                                  </button>
                                   <button className="btn btn-ghost" style={{ padding: '0.4rem', color: 'var(--danger)' }} onClick={() => handleDeleteMaterial(m.id)}>
                                     <Trash2 size={15} />
                                   </button>
@@ -801,9 +817,9 @@ const Definitions = () => {
       {/* Malzeme/Gider Modal — Stepped */}
       {showMatModal && (() => {
         const isGider    = activeTab === 'gider';
-        // Sadece modal contextual butondan açıldıysa kilitli kalsın, tepedeki ana butondan açıldıysa (forcedContext false ise) kilitleri aç
-        const cardLocked = isGider ? !!matForm.account_card : !!matForm.category;
-        const catLocked  = isGider && !!matForm.category;
+        // Düzenleme modunda adımlar kilitli değil; yeni eklemede context varsa kilitli
+        const cardLocked = !editMaterial && (isGider ? !!matForm.account_card : !!matForm.category);
+        const catLocked  = !editMaterial && isGider && !!matForm.category;
         const currentContext = isGider ? matForm.account_card : matForm.category;
         const cardMeta   = CARD_META[currentContext] || {};
 
@@ -828,8 +844,8 @@ const Definitions = () => {
           <div style={overlay}>
             <div className="card" style={{ ...modal, maxWidth: '500px' }}>
               <ModalHeader
-                title={isGider ? 'Yeni Gider Kalemi Ekle' : 'Yeni Malzeme Ekle'}
-                onClose={() => setShowMatModal(false)}
+                title={editMaterial ? (isGider ? 'Gider Kalemi Düzenle' : 'Malzeme Düzenle') : (isGider ? 'Yeni Gider Kalemi Ekle' : 'Yeni Malzeme Ekle')}
+                onClose={() => { setShowMatModal(false); setEditMaterial(null); }}
               />
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -886,7 +902,7 @@ const Definitions = () => {
 
               </div>
 
-              <ModalFooter onCancel={() => setShowMatModal(false)} onSave={handleSaveMaterial} />
+              <ModalFooter onCancel={() => { setShowMatModal(false); setEditMaterial(null); }} onSave={handleSaveMaterial} saveLabel={editMaterial ? 'Güncelle' : 'Kaydet'} />
             </div>
           </div>
         );
