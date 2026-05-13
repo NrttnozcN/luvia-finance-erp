@@ -99,7 +99,7 @@ const RevenueExpense = () => {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem' }}>Gelir & Gider Yönetimi</h1>
-          <p className="text-muted">İşletmenizin nakit hareketlerini tesis ve hesap kartı bazlı takip edin.</p>
+          <p className="text-muted">İşletmenizin nakit hareketlerini tesis ve kategori bazlı takip edin.</p>
         </div>
         <button className="btn btn-primary" onClick={() => { setNewTransaction(emptyForm()); setShowAddModal(true); }}>
           <Plus size={20} /> Yeni Hareket Ekle
@@ -127,7 +127,7 @@ const RevenueExpense = () => {
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
               <th style={{ padding: '1.25rem' }}>Tür</th>
               <th>Tesis</th>
-              <th>Hesap Kartı</th>
+              <th>Kategori</th>
               <th>Açıklama</th>
               <th>Tutar</th>
               <th>Tarih</th>
@@ -148,7 +148,7 @@ const RevenueExpense = () => {
                     </span>
                   </td>
                   <td style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{getFacilityName(t.facility_id) || '—'}</td>
-                  <td style={{ fontWeight: '600', fontSize: '0.85rem' }}>{t.account_card || t.category || '—'}</td>
+                  <td style={{ fontWeight: '600', fontSize: '0.85rem' }}>{t.category || '—'}</td>
                   <td className="text-dim" style={{ fontSize: '0.9rem' }}>{t.description || '—'}</td>
                   <td style={{ fontWeight: '800', color: t.type.includes('Gelir') || t.type === 'Tahsilat' ? 'var(--success)' : 'var(--danger)' }}>
                     ₺{Number(t.amount || 0).toLocaleString('tr-TR')}

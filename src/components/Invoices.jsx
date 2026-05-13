@@ -6,8 +6,6 @@ import {
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
 
-const GIDER_CARDS = ['Araç ve İş Makinesi Giderleri', 'Akaryakıt Giderleri', 'Büro Malzemesi Giderleri', 'Yemek ve Gıda Giderleri', 'Tesis Giderleri', 'Personel Giderleri', 'Diğer Giderler'];
-const GELIR_CARDS = ['Hakediş Geliri', 'Ürün Satış Geliri', 'Hizmet Satış Geliri', 'Diğer Gelirler'];
 
 const Invoices = ({ initialView = 'list' }) => {
   const currentUser = useAuthStore(s => s.currentUser);
@@ -696,35 +694,19 @@ const InputGroup = ({ label, placeholder, type, value, onChange }) => (
 );
 
 const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) => {
-  const topCards = invoiceType === 'Alış Faturası' ? GIDER_CARDS : GELIR_CARDS;
-
-  // Fatura tipine göre ön filtre
   const typeFiltered = materials.filter(m =>
     invoiceType === 'Alış Faturası' ? m.item_type === 'Gider' : m.item_type !== 'Gider'
   );
 
-  // account_card yoksa bile seçilebilir olsun — null/boş olanlar "Diğer" grubuna girer
-  const validCards = topCards.filter(c => typeFiltered.some(m => m.account_card === c));
-
   const selectedMat = materials.find(m => m.id === value);
-  const [selCard, setSelCard] = useState(selectedMat?.account_card || '');
-  const [selCat,  setSelCat]  = useState(selectedMat?.category    || '');
+  const [selCat, setSelCat] = useState(selectedMat?.category || '');
 
-  // Fatura tipi değişince seçimleri sıfırla
-  useEffect(() => { setSelCard(''); setSelCat(''); }, [invoiceType]);
+  useEffect(() => { setSelCat(''); }, [invoiceType]);
 
-  // Seçilen karta ait kategoriler
-  const availableCats = selCard
-    ? [...new Set(typeFiltered.filter(m => m.account_card === selCard).map(m => m.category).filter(Boolean))]
-    : [];
+  const availableCats = [...new Set(typeFiltered.map(m => m.category).filter(Boolean))].sort();
+  const availableMats = selCat ? typeFiltered.filter(m => m.category === selCat) : [];
 
-  // Seçilen kart + kategoriye ait malzemeler
-  const availableMats = selCard && selCat
-    ? typeFiltered.filter(m => m.account_card === selCard && m.category === selCat)
-    : [];
-
-  const handleCard = (c) => { setSelCard(c); setSelCat(''); onChange(''); };
-  const handleCat  = (c) => { setSelCat(c);  onChange(''); };
+  const handleCat = (c) => { setSelCat(c); onChange(''); };
 
   const selStyle = (active) => ({
     fontSize: '0.82rem',
@@ -735,25 +717,10 @@ const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) =>
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-      {/* Adım 1 — Hesap Kartı */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>1 · Hesap Kartı</span>
-        <select className="input" style={selStyle(!!selCard)} value={selCard} onChange={e => handleCard(e.target.value)}>
-          <option value="">Seçiniz...</option>
-          {topCards.map(c => (
-            <option key={c} value={c} disabled={!validCards.includes(c)}>
-              {c}{!validCards.includes(c) ? ' (boş)' : ''}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <ChevronRight size={14} style={{ color: selCard ? 'var(--primary)' : 'var(--border)', flexShrink: 0, marginTop: '16px' }} />
-
-      {/* Adım 2 — Kategori */}
-      <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <span style={{ fontSize: '0.68rem', fontWeight: '700', color: selCard ? 'var(--primary)' : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>2 · Kategori</span>
-        <select className="input" style={selStyle(!!selCat)} value={selCat} onChange={e => handleCat(e.target.value)} disabled={!selCard}>
+      {/* Adım 1 — Kategori */}
+      <div style={{ flex: '0 0 200px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>1 · Kategori</span>
+        <select className="input" style={selStyle(!!selCat)} value={selCat} onChange={e => handleCat(e.target.value)}>
           <option value="">Seçiniz...</option>
           {availableCats.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -761,9 +728,9 @@ const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) =>
 
       <ChevronRight size={14} style={{ color: selCat ? 'var(--primary)' : 'var(--border)', flexShrink: 0, marginTop: '16px' }} />
 
-      {/* Adım 3 — Ürün/Hizmet */}
+      {/* Adım 2 — Ürün/Hizmet */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <span style={{ fontSize: '0.68rem', fontWeight: '700', color: selCat ? 'var(--primary)' : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>3 · Ürün / Hizmet</span>
+        <span style={{ fontSize: '0.68rem', fontWeight: '700', color: selCat ? 'var(--primary)' : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>2 · Ürün / Hizmet</span>
         <select className="input" style={{ ...(hasError ? { borderColor: '#ef4444' } : selStyle(!!value)) }} value={value} onChange={e => onChange(e.target.value)} disabled={!selCat}>
           <option value="">Seçiniz...</option>
           {availableMats.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
