@@ -755,8 +755,8 @@ const Definitions = () => {
       )}
       {/* TOPLU YÜKLEME MODALI */}
       {showBulkModal && (
-        <div style={modalOverlayStyle}>
-          <div className="card" style={{ ...modalContentStyle, maxWidth: '600px' }}>
+        <div style={overlay}>
+          <div className="card" style={{ ...modal, maxWidth: '600px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
                 <h2 style={{ fontSize: '1.25rem' }}>Toplu Malzeme Yükle (Excel'den)</h2>
