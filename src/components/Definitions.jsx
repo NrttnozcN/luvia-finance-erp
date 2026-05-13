@@ -403,14 +403,14 @@ const Definitions = () => {
           <h1 style={{ fontSize: '2rem' }}>Sistem Tanımlamaları</h1>
           <p className="text-muted">Kartlar, kasalar, kullanıcılar, roller ve doküman kategorilerini yönetin.</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexShrink: 0, zIndex: 9999 }}>
           {(activeTab === 'malzeme' || activeTab === 'gider') && drillCard && (
-            <button className="btn btn-ghost" onClick={() => setShowBulkModal(true)} style={{ color: 'var(--primary)', fontWeight: '700' }}>
+            <button className="btn btn-ghost" onClick={() => setShowBulkModal(true)} style={{ color: 'var(--primary)', fontWeight: '700', whiteSpace: 'nowrap' }}>
               📥 Toplu Yükle
             </button>
           )}
-          <button className="btn btn-primary" onClick={handleAddClick}>
-            <Plus size={20} /> {ADD_LABELS[activeTab]}
+          <button className="btn btn-primary" onClick={handleAddClick} style={{ minWidth: '160px', boxShadow: '0 4px 12px rgba(var(--primary-rgb), 0.3)', whiteSpace: 'nowrap' }}>
+            <Plus size={20} /> {ADD_LABELS[activeTab] || 'Yeni Ekle'}
           </button>
         </div>
       </header>
