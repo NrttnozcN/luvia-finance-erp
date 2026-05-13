@@ -694,8 +694,9 @@ const InputGroup = ({ label, placeholder, type, value, onChange }) => (
 );
 
 const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) => {
+  // Alış: Gider + Malzeme (Gelir hariç) | Satış: Gelir + Malzeme (Gider hariç)
   const typeFiltered = materials.filter(m =>
-    invoiceType === 'Alış Faturası' ? m.item_type === 'Gider' : m.item_type !== 'Gider'
+    invoiceType === 'Alış Faturası' ? m.item_type !== 'Gelir' : m.item_type !== 'Gider'
   );
 
   const selectedMat = materials.find(m => m.id === value);
