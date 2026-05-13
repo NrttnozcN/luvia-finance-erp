@@ -507,8 +507,8 @@ const Definitions = () => {
 
                         const meta  = CARD_META[card] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
                         const count = materials.filter(m => {
-                          if (isGider) return m.account_card === c || (!m.account_card && c === 'Diğer Giderler');
-                          return m.category === c || (!m.category && c === 'Diğer');
+                          if (isGider) return m.account_card === card || (!m.account_card && card === 'Diğer Giderler');
+                          return m.category === card || (!m.category && card === 'Diğer');
                         }).length;
                         return (
                           <div key={card} onClick={() => { setDrillCard(card); setDrillCat(null); }}
