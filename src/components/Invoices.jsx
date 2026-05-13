@@ -24,6 +24,9 @@ const Invoices = ({ initialView = 'list' }) => {
   const [materials, setMaterials] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [itemErrors, setItemErrors] = useState([]);
+  const [detailInvoice, setDetailInvoice] = useState(null);
+  const [detailItems, setDetailItems] = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
   
   const [newInvoice, setNewInvoice] = useState({
     invoice_no: '',
@@ -65,6 +68,18 @@ const Invoices = ({ initialView = 'list' }) => {
     });
     setItemErrors([]);
     setView('create');
+  };
+
+  const handleOpenDetail = async (invoice) => {
+    setDetailInvoice(invoice);
+    setDetailLoading(true);
+    setView('detail');
+    const { data } = await supabase
+      .from('invoice_items')
+      .select('*, materials(name, unit)')
+      .eq('invoice_id', invoice.id);
+    setDetailItems(data || []);
+    setDetailLoading(false);
   };
 
   const handleAddItem = () => {
@@ -171,6 +186,119 @@ const Invoices = ({ initialView = 'list' }) => {
       setNewInvoice({ invoice_no: '', customer_id: '', date: new Date().toISOString().split('T')[0], description: '', islem_turu: 'Satış Faturası', fatura_tipi: 'Ticari', items: [] });
     }
   };
+
+  if (view === 'detail' && detailInvoice) {
+    const fmt = (n) => Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const inv = detailInvoice;
+    const isSatis = inv.islem_turu === 'Satış Faturası';
+    const matrahTop = detailItems.reduce((a, it) => a + Number(it.quantity) * Number(it.unit_price), 0);
+    const kdvTop    = detailItems.reduce((a, it) => a + Number(it.quantity) * Number(it.unit_price) * (it.vat_rate || 0) / 100, 0);
+    const odenecek  = matrahTop + kdvTop;
+
+    return (
+      <div style={{ maxWidth: '1100px' }}>
+        <header style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem' }}>
+          <button className="btn btn-ghost" onClick={() => { setView('list'); setDetailInvoice(null); setDetailItems([]); }}>
+            <ArrowLeft size={20} /> Geri
+          </button>
+          <div>
+            <h1 style={{ fontSize: '1.75rem' }}>Fatura Detayı</h1>
+            <p className="text-muted" style={{ fontSize: '0.85rem' }}>{inv.invoice_no}</p>
+          </div>
+          <div style={{ marginLeft: 'auto' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: '700', padding: '0.3rem 0.9rem', borderRadius: '20px',
+              background: isSatis ? '#dcfce7' : '#fee2e2', color: isSatis ? '#166534' : '#991b1b' }}>
+              {isSatis ? '↑ Satış Faturası' : '↓ Alış Faturası'}
+            </span>
+          </div>
+        </header>
+
+        {/* Fatura Bilgileri */}
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+            Fatura Bilgileri
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem' }}>
+            {[
+              { label: 'Fatura No',    value: inv.invoice_no },
+              { label: 'Cari / Ünvan', value: inv.customers?.name || '—' },
+              { label: 'Tarih',        value: inv.date ? new Date(inv.date).toLocaleDateString('tr-TR') : '—' },
+              { label: 'Fatura Tipi',  value: inv.fatura_tipi || '—' },
+            ].map(f => (
+              <div key={f.label}>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: '600', marginBottom: '4px' }}>{f.label}</p>
+                <p style={{ fontWeight: '700', fontSize: '0.95rem' }}>{f.value}</p>
+              </div>
+            ))}
+            {inv.description && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: '600', marginBottom: '4px' }}>Açıklama</p>
+                <p style={{ fontWeight: '600', fontSize: '0.9rem' }}>{inv.description}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Fatura Kalemleri */}
+        <div className="card" style={{ padding: '0', marginBottom: '1.5rem' }}>
+          <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)' }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Fatura Kalemleri</p>
+          </div>
+          {detailLoading ? (
+            <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)' }}>Yükleniyor...</p>
+          ) : detailItems.length === 0 ? (
+            <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)' }}>Kalem bulunamadı.</p>
+          ) : (
+            <table style={{ width: '100%' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-main)' }}>
+                  {['Ürün / Hizmet', 'Açıklama', 'Miktar', 'Birim Fiyat', 'KDV %', 'Matrah', 'KDV', 'KDV Dahil'].map(h => (
+                    <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-dim)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {detailItems.map((it, idx) => {
+                  const matrah = Number(it.quantity) * Number(it.unit_price);
+                  const kdv    = matrah * (it.vat_rate || 0) / 100;
+                  return (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--bg-main)' }}>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: '700', fontSize: '0.88rem' }}>{it.materials?.name || '—'}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.82rem', color: 'var(--text-dim)' }}>{it.description || '—'}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.88rem' }}>{it.quantity} {it.materials?.unit || ''}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.88rem' }}>₺{fmt(it.unit_price)}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.88rem' }}>%{it.vat_rate || 0}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.88rem' }}>₺{fmt(matrah)}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.88rem', color: '#f59e0b' }}>₺{fmt(kdv)}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: '800', fontSize: '0.95rem', color: isSatis ? '#16a34a' : '#dc2626' }}>₺{fmt(matrah + kdv)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Toplam */}
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '3rem', alignItems: 'center' }}>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: '600', marginBottom: '4px' }}>KDV Hariç</p>
+              <p style={{ fontWeight: '700', fontSize: '1.1rem' }}>₺{fmt(matrahTop)}</p>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: '600', marginBottom: '4px' }}>KDV Toplamı</p>
+              <p style={{ fontWeight: '700', fontSize: '1.1rem' }}>₺{fmt(kdvTop)}</p>
+            </div>
+            <div style={{ paddingLeft: '2rem', borderLeft: '2px solid var(--border)', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: '600', marginBottom: '4px' }}>Ödenecek Tutar</p>
+              <p style={{ fontWeight: '800', fontSize: '1.75rem', color: 'var(--primary)' }}>₺{fmt(odenecek)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (view === 'create') {
     const fmt = (n) => Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -457,7 +585,9 @@ const Invoices = ({ initialView = 'list' }) => {
               <tr><td colSpan="5" style={{ textAlign: 'center', padding: '3rem' }}>Henüz fatura işlenmemiş.</td></tr>
             ) : (
               invoices.map(i => (
-                <tr key={i.id} style={{ borderBottom: '1px solid var(--bg-main)' }}>
+                <tr key={i.id} onClick={() => handleOpenDetail(i)} style={{ borderBottom: '1px solid var(--bg-main)', cursor: 'pointer' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '1.25rem' }}>
                     <p style={{ fontWeight: '700' }}>{i.invoice_no}</p>
                     <p className="text-muted" style={{ fontSize: '0.8rem' }}>{new Date(i.date).toLocaleDateString('tr-TR')}</p>
