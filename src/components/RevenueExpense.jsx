@@ -13,6 +13,7 @@ const emptyForm = () => ({
   type: 'Gider (Çıkış)',
   facility_id: '',
   account_card: '',
+  category: '',
   material_id: '',
   amount: '',
   date: new Date().toISOString().split('T')[0],
@@ -46,7 +47,7 @@ const RevenueExpense = () => {
       supabase.from('finance_transactions').select('*').eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('facilities').select('id, name').eq('company_id', cid).order('name'),
       supabase.from('account_cards').select('*').eq('company_id', cid).order('name'),
-      supabase.from('materials').select('id, name, account_card, item_type').eq('company_id', cid).order('name'),
+      supabase.from('materials').select('id, name, account_card, category, item_type').eq('company_id', cid).order('name'),
     ]);
     setTransactions(trans || []);
     setFacilities(facs || []);
@@ -235,9 +236,20 @@ const TransactionModal = ({ title, form, setForm, onClose, onSave, saveLabel, fa
   const fallbackCards  = isGider ? giderFallback : gelirFallback;
   const cardOptions    = availableCards.length > 0 ? availableCards.map(c => c.name) : fallbackCards;
 
-  const filteredMats   = materialsList.filter(m =>
-    (isGider ? m.item_type === 'Gider' : m.item_type !== 'Gider') &&
-    (!form.account_card || m.account_card === form.account_card)
+  const typeFilteredMats = materialsList.filter(m =>
+    isGider ? m.item_type === 'Gider' : m.item_type !== 'Gider'
+  );
+
+  const categoryOptions = [...new Set(
+    typeFilteredMats
+      .filter(m => !form.account_card || m.account_card === form.account_card)
+      .map(m => m.category)
+      .filter(Boolean)
+  )].sort();
+
+  const filteredMats = typeFilteredMats.filter(m =>
+    (!form.account_card || m.account_card === form.account_card) &&
+    (!form.category    || m.category     === form.category)
   );
 
   const Step = ({ num, label, done, children }) => (
@@ -270,7 +282,7 @@ const TransactionModal = ({ title, form, setForm, onClose, onSave, saveLabel, fa
           <div>
             <label className="label-sm">TÜR</label>
             <select className="input" value={form.type}
-              onChange={e => setForm({ ...form, type: e.target.value, account_card: '', material_id: '' })}>
+              onChange={e => setForm({ ...form, type: e.target.value, account_card: '', category: '', material_id: '' })}>
               <option>Gider (Çıkış)</option>
               <option>Gelir (Giriş)</option>
             </select>
@@ -288,20 +300,30 @@ const TransactionModal = ({ title, form, setForm, onClose, onSave, saveLabel, fa
           {/* ADIM 2 — Hesap Kartı */}
           <Step num={2} label="Hesap Kartı" done={!!form.account_card}>
             <select className="input" value={form.account_card || ''}
-              onChange={e => setForm({ ...form, account_card: e.target.value, material_id: '' })}>
+              onChange={e => setForm({ ...form, account_card: e.target.value, category: '', material_id: '' })}>
               <option value="">Seçiniz...</option>
               {cardOptions.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </Step>
 
-          {/* ADIM 3 — Malzeme/Hizmet */}
-          <Step num={3} label="Malzeme / Hizmet Adı" done={!!form.material_id}>
-            <select className="input" value={form.material_id || ''} disabled={!form.account_card}
+          {/* ADIM 3 — Kategori */}
+          <Step num={3} label="Kategori" done={!!form.category}>
+            <select className="input" value={form.category || ''} disabled={!form.account_card}
+              onChange={e => setForm({ ...form, category: e.target.value, material_id: '' })}>
+              <option value="">Seçiniz...</option>
+              {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {!form.account_card && <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>Önce hesap kartı seçin</p>}
+          </Step>
+
+          {/* ADIM 4 — Malzeme/Hizmet */}
+          <Step num={4} label="Malzeme / Hizmet Adı" done={!!form.material_id}>
+            <select className="input" value={form.material_id || ''} disabled={!form.category}
               onChange={e => setForm({ ...form, material_id: e.target.value })}>
               <option value="">Seçiniz... (opsiyonel)</option>
               {filteredMats.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
-            {!form.account_card && <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>Önce hesap kartı seçin</p>}
+            {!form.category && <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>Önce kategori seçin</p>}
           </Step>
 
           {/* Tutar + Tarih */}
