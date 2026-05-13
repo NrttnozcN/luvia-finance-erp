@@ -336,45 +336,34 @@ const Definitions = () => {
   };
 
   // ─── Header button ───────────────────────────────────────────────────────────
+  // ─── Header button (Global & Serbest Kayıt) ───
   const handleAddClick = () => {
-    if (activeTab === 'gider') {
+    if (activeTab === 'gider' || activeTab === 'malzeme') {
+      const isGider = activeTab === 'gider';
       setMatForm({
-        name: '', unit: 'Adet', item_type: 'Gider',
-        account_card: drillCard || GIDER_CARDS[0],
-        category: drillCat || '',
-      });
-      setShowMatModal(true);
-    } else if (activeTab === 'malzeme') {
-      setMatForm({
-        name: '', unit: 'Adet', item_type: 'Malzeme',
-        account_card: '',
-        category: drillCard || MALZEME_CATS[0],
+        name: '', unit: 'Adet', 
+        item_type: isGider ? 'Gider' : 'Malzeme',
+        account_card: '', category: '',
       });
       setShowMatModal(true);
     } else if (activeTab === 'kasalar') {
+      setKasaForm({ name: '', type: 'Kasa' });
       setShowKasaModal(true);
     } else if (activeTab === 'users') {
+      setUserForm({ full_name: '', username: '', email: '', password: '', roleType: 'admin' });
+      setEditUser(null);
       setShowUserModal(true);
     } else if (activeTab === 'roles') {
       setEditRole(null);
       setRoleForm({ name: '', permissions: [] });
       setShowRoleModal(true);
     } else if (activeTab === 'doc_cats') {
+      setDocCatForm({ name: '' });
       setShowDocCatModal(true);
     }
   };
 
-  const handleOpenAddModal = () => {
-    const isGider = activeTab === 'gider';
-    setMatForm({
-      name: '', unit: 'Adet',
-      item_type:    isGider ? 'Gider' : 'Malzeme',
-      account_card: isGider ? (drillCard || '') : '',
-      category:     isGider ? (drillCat || '') : (drillCard || ''),
-    });
-    setShowMatModal(true);
-  };
-
+  // ─── Grid/Contextual button (Klasör İçinden Hızlı Kayıt) ───
   const handleOpenAddModal = () => {
     setMatForm({
       name: '', 
