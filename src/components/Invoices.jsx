@@ -53,6 +53,28 @@ const Invoices = ({ initialView = 'list' }) => {
     fetchData();
   }, []);
 
+  const handleNewInvoice = async () => {
+    const now = new Date();
+    const yy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const { count } = await supabase
+      .from('invoices')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', cid);
+    const seq = String((count || 0) + 1).padStart(5, '0');
+    setNewInvoice({
+      invoice_no: `FTR${yy}${mm}-${seq}`,
+      customer_id: '',
+      date: now.toISOString().split('T')[0],
+      description: '',
+      islem_turu: 'Satış Faturası',
+      fatura_tipi: 'Ticari',
+      items: [],
+    });
+    setItemErrors([]);
+    setView('create');
+  };
+
   const handleAddItem = () => {
     setNewInvoice({
       ...newInvoice,
@@ -395,7 +417,7 @@ const Invoices = ({ initialView = 'list' }) => {
           <h1 style={{ fontSize: '2rem' }}>Fatura & Muhasebe</h1>
           <p className="text-muted">Gelen ve giden faturalarınızı işleyin, cari hesaplarınızı takip edin.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setView('create')}>
+        <button className="btn btn-primary" onClick={handleNewInvoice}>
           <Plus size={20} /> Yeni Fatura İşle
         </button>
       </header>
