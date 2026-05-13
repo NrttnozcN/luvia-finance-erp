@@ -53,19 +53,11 @@ const Invoices = ({ initialView = 'list' }) => {
     fetchData();
   }, []);
 
-  const handleNewInvoice = async () => {
-    const now = new Date();
-    const yy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const { count } = await supabase
-      .from('invoices')
-      .select('id', { count: 'exact', head: true })
-      .eq('company_id', cid);
-    const seq = String((count || 0) + 1).padStart(5, '0');
+  const handleNewInvoice = () => {
     setNewInvoice({
-      invoice_no: `FTR${yy}${mm}-${seq}`,
+      invoice_no: '',
       customer_id: '',
-      date: now.toISOString().split('T')[0],
+      date: new Date().toISOString().split('T')[0],
       description: '',
       islem_turu: 'Satış Faturası',
       fatura_tipi: 'Ticari',
@@ -102,6 +94,19 @@ const Invoices = ({ initialView = 'list' }) => {
   const handleSaveInvoice = async () => {
     if (!newInvoice.customer_id || !newInvoice.invoice_no) {
       alert('Lütfen fatura no ve cari bilgisini doldurun.');
+      return;
+    }
+
+    // Aynı cariye ait bu fatura numarası sistemde kayıtlı mı?
+    const { data: existing } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('company_id', cid)
+      .eq('customer_id', newInvoice.customer_id)
+      .eq('invoice_no', newInvoice.invoice_no)
+      .limit(1);
+    if (existing && existing.length > 0) {
+      alert('Bu fatura sistemde kayıtlıdır.');
       return;
     }
 
