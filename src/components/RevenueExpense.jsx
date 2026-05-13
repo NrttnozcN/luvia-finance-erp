@@ -37,7 +37,6 @@ const RevenueExpense = () => {
     const [
       { data: trans },
       { data: facs },
-      { data: acCards },
       { data: mats },
     ] = await Promise.all([
       supabase.from('finance_transactions').select('*').eq('company_id', cid).order('created_at', { ascending: false }),
