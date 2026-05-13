@@ -416,6 +416,7 @@ const Invoices = ({ initialView = 'list' }) => {
                           value={item.material_id}
                           materials={materials}
                           hasError={!!err.material_id}
+                          invoiceType={newInvoice.islem_turu}
                           onChange={(id) => { const ni = [...newInvoice.items]; ni[idx].material_id = id; setNewInvoice({...newInvoice, items: ni}); }}
                         />
                         {err.material_id && <span style={{ fontSize: '0.75rem', color: '#ef4444' }}>{err.material_id}</span>}
@@ -699,15 +700,32 @@ const InputGroup = ({ label, placeholder, type, value, onChange }) => (
   </div>
 );
 
-const MaterialSelect = ({ value, materials, onChange, hasError }) => {
+const MaterialSelect = ({ value, materials, onChange, hasError, invoiceType }) => {
   const [query, setQuery]   = useState('');
   const [open, setOpen]     = useState(false);
+  const [filterCard, setFilterCard] = useState('');
+  const [filterCat, setFilterCat]   = useState('');
   const ref                 = useRef(null);
 
   const selected  = materials.find(m => m.id === value);
-  const filtered  = query.trim()
-    ? materials.filter(m => m.name.toLowerCase().includes(query.toLowerCase()))
-    : materials;
+  
+  // Önce fatura tipine göre (Alış -> Gider, Satış -> Gelir) filtrele
+  let filtered = materials.filter(m => {
+    if (invoiceType === 'Alış Faturası') return m.item_type === 'Gider';
+    if (invoiceType === 'Satış Faturası') return m.item_type === 'Gelir' || m.item_type === 'Malzeme';
+    return true;
+  });
+
+  // Sonra seçilen Kart ve Kategoriye göre filtrele
+  if (filterCard) filtered = filtered.filter(m => m.account_card === filterCard);
+  if (filterCat)  filtered = filtered.filter(m => m.category === filterCat);
+  
+  if (query.trim()) {
+    filtered = filtered.filter(m => m.name.toLowerCase().includes(query.toLowerCase()));
+  }
+
+  const cards = [...new Set(materials.map(m => m.account_card).filter(Boolean))];
+  const cats  = [...new Set(materials.map(m => m.category).filter(Boolean))];
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -725,51 +743,71 @@ const MaterialSelect = ({ value, materials, onChange, hasError }) => {
     <div ref={ref} style={{ position: 'relative' }}>
       <div
         className="input"
-        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'text', padding: '0', ...(hasError ? { borderColor: '#ef4444' } : {}) }}
+        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'text', padding: '0', minHeight: '42px', ...(hasError ? { borderColor: '#ef4444' } : {}) }}
         onClick={() => setOpen(true)}
       >
-        {open ? (
-          <input
-            autoFocus
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Ara..."
-            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', padding: '0.6rem 0.85rem', fontSize: '0.9rem', width: '100%' }}
-          />
-        ) : (
-          <span style={{ flex: 1, padding: '0.6rem 0.85rem', fontSize: '0.9rem', color: selected ? 'var(--text)' : 'var(--text-dim)' }}>
-            {selected ? selected.name : 'Seçiniz...'}
-          </span>
-        )}
+        <div style={{ flex: 1, padding: '0.6rem 0.85rem' }}>
+          {selected ? (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>{selected.name}</span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{selected.account_card} / {selected.category}</span>
+            </div>
+          ) : (
+            <span style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>Ürün / Hizmet Seçiniz...</span>
+          )}
+        </div>
         <span style={{ paddingRight: '0.75rem', color: 'var(--text-dim)', fontSize: '0.75rem' }}>▼</span>
       </div>
 
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
-          background: 'white', border: '1px solid var(--border)', borderRadius: '10px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: '240px', overflowY: 'auto',
+          background: 'white', border: '1px solid var(--border)', borderRadius: '12px',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.15)', minWidth: '400px', overflow: 'hidden'
         }}>
-          {filtered.length === 0 ? (
-            <div style={{ padding: '1rem', color: 'var(--text-dim)', fontSize: '0.85rem', textAlign: 'center' }}>Sonuç bulunamadı</div>
-          ) : filtered.map(m => (
-            <div
-              key={m.id}
-              onMouseDown={() => handleSelect(m)}
-              style={{
-                padding: '0.6rem 1rem', cursor: 'pointer', fontSize: '0.88rem',
-                background: m.id === value ? 'var(--primary-light)' : 'transparent',
-                color: m.id === value ? 'var(--primary)' : 'var(--text)',
-                fontWeight: m.id === value ? '700' : '400',
-                borderBottom: '1px solid var(--bg-main)',
-              }}
-              onMouseEnter={e => { if (m.id !== value) e.currentTarget.style.background = 'var(--bg-main)'; }}
-              onMouseLeave={e => { if (m.id !== value) e.currentTarget.style.background = 'transparent'; }}
-            >
-              {m.name}
-              {m.category && <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>{m.category}</span>}
-            </div>
-          ))}
+          {/* Hızlı Filtre Barı */}
+          <div style={{ padding: '0.75rem', background: 'var(--bg-main)', borderBottom: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <select className="input-sm" value={filterCard} onChange={e => setFilterCard(e.target.value)} style={{ fontSize: '0.75rem' }}>
+              <option value="">Tüm Kartlar</option>
+              {cards.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className="input-sm" value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ fontSize: '0.75rem' }}>
+              <option value="">Tüm Kategoriler</option>
+              {cats.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <input 
+              autoFocus
+              className="input-sm"
+              placeholder="İsim ile ara..."
+              style={{ gridColumn: '1 / -1', fontSize: '0.75rem' }}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+            />
+          </div>
+
+          <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                Kriterlere uygun sonuç bulunamadı.
+              </div>
+            ) : filtered.map(m => (
+              <div
+                key={m.id}
+                onMouseDown={() => handleSelect(m)}
+                style={{
+                  padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--bg-main)',
+                  background: m.id === value ? 'var(--primary-light)' : 'transparent'
+                }}
+                onMouseEnter={e => { if (m.id !== value) e.currentTarget.style.background = 'var(--bg-main)'; }}
+                onMouseLeave={e => { if (m.id !== value) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '0.88rem', color: m.id === value ? 'var(--primary)' : 'var(--text)' }}>{m.name}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+                  {m.account_card} <span style={{ opacity: 0.5 }}>•</span> {m.category}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -11,9 +11,10 @@ import { supabase } from '../lib/supabase';
 import useAuthStore, { MODULE_MATRIX, MODULE_LABELS } from '../store/authStore';
 
 // ─── Sabit Kategoriler ───────────────────────────────────────────────────────
-const GIDER_CATS   = ['Gider', 'Hizmet', 'Kırtasiye', 'İkram', 'Ulaşım', 'Diğer'];
-const MALZEME_CATS = ['Yedek Parça', 'Akaryakıt', 'Yağ & Filtre', 'Lastik', 'Diğer Malzeme'];
-const UNITS        = ['Adet', 'Litre', 'Kg', 'Saat', 'Metre', 'Kutu'];
+const GIDER_CARDS   = ['Araç ve İş Makinesi Giderleri', 'Akaryakıt Giderleri', 'Büro Malzemesi Giderleri', 'Yemek ve Gıda Giderleri', 'Tesis Giderleri', 'Personel Giderleri', 'Diğer Giderler'];
+const GELIR_CARDS   = ['Hakediş Geliri', 'Ürün Satış Geliri', 'Hizmet Satış Geliri', 'Diğer Gelirler'];
+const MALZEME_CATS  = ['Yedek Parça', 'Akaryakıt', 'Yağ & Filtre', 'Lastik', 'Büro Malzemesi', 'Gıda', 'Hizmet', 'Diğer'];
+const UNITS         = ['Adet', 'Litre', 'Kg', 'Saat', 'Metre', 'Kutu', 'Gün'];
 
 const Definitions = () => {
   const currentUser = useAuthStore(s => s.currentUser);
@@ -120,7 +121,7 @@ const Definitions = () => {
     const { error } = await supabase.from('materials').insert([{ ...matForm }]);
     if (error) { alert(error.message); return; }
     setShowMatModal(false);
-    setMatForm({ name: '', category: 'Gider', unit: 'Adet', item_type: 'Gider' });
+    setMatForm({ name: '', category: 'Diğer', unit: 'Adet', item_type: activeTab === 'gider' ? 'Gider' : 'Malzeme', account_card: '' });
     fetchMaterials(activeTab === 'gider' ? 'Gider' : 'Malzeme');
   };
 
