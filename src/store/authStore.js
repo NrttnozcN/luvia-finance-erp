@@ -13,7 +13,7 @@ export const MODULE_MATRIX = [
   { group: 'Genel',             items: ['dashboard', 'facilities'] },
   { group: 'Finans Yönetimi',   items: ['cariler', 'invoices', 'wallets', 'rev_exp', 'checks'] },
   { group: 'Operasyon & Filo',  items: ['stock', 'vehicles', 'fuel', 'tires', 'purchasing'] },
-  { group: 'İnsan Kaynakları',  items: ['personnel'] },
+  { group: 'İnsan Kaynakları',  items: ['personnel_def', 'personnel_payroll', 'personnel_pos'] },
   { group: 'Muhasebe & Defter', items: ['ledgers', 'transfers'] },
   { group: 'Raporlama',         items: ['costs', 'sales', 'logs', 'cari_rapor', 'kasa_rapor'] },
   { group: 'Sistem',            items: ['alerts', 'settings', 'definitions'] },
@@ -26,7 +26,9 @@ export const MODULE_LABELS = {
   checks:     'Çek & Senet',         stock:      'Stok & Depo',
   vehicles:   'Araç Yönetimi',       fuel:       'Akaryakıt Takibi',
   tires:      'Lastik İşlemleri',    purchasing: 'Satın Alma',
-  personnel:  'Personel & Puantaj',
+  personnel_def:     'Personel Tanımlama',
+  personnel_payroll: 'Pusula & Puantaj',
+  personnel_pos:     'Pozisyon Değişikliği',
   ledgers:    'Defter İşlemleri',    transfers:  'Toplu Devirler',
   costs:      'Maliyet Raporları',   sales:      'Satış Raporları',
   logs:       'Döküman Yönetimi',    cari_rapor: 'Cari Hareket Raporu',
@@ -39,7 +41,7 @@ export const MODULE_LABELS = {
 const LEGACY_PERMISSIONS = {
   Muhasebe:  ['dashboard', 'cariler', 'invoices', 'wallets', 'checks', 'rev_exp',
                'ledgers', 'costs', 'sales', 'logs', 'alerts', 'transfers', 'cari_rapor', 'kasa_rapor'],
-  Operasyon: ['dashboard', 'facilities', 'stock', 'vehicles', 'fuel', 'tires', 'purchasing', 'personnel', 'alerts'],
+  Operasyon: ['dashboard', 'facilities', 'stock', 'vehicles', 'fuel', 'tires', 'purchasing', 'personnel_def', 'personnel_payroll', 'personnel_pos', 'alerts'],
   Izleme:    ['dashboard', 'costs', 'sales', 'alerts'],
 };
 

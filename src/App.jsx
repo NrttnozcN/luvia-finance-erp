@@ -205,7 +205,9 @@ const App = () => {
       case 'fuel': return <Fuel />;
       case 'tires': return <Tires />;
       case 'purchasing': return <Purchasing />;
-      case 'personnel': return <Personnel />;
+      case 'personnel': case 'personnel_def': return <Personnel initialTab="definition" />;
+      case 'personnel_payroll': return <Personnel initialTab="payroll" />;
+      case 'personnel_pos': return <Personnel initialTab="position" />;
       case 'documents': case 'logs': return <Documents />;
       case 'settings': return <Settings />;
       case 'stock': return <Stock />;

@@ -51,6 +51,7 @@ const Vehicles = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newVehicle, setNewVehicle] = useState({ ...EMPTY_VEHICLE });
   const [addErr, setAddErr] = useState({});
+  const [employees, setEmployees] = useState([]);
 
   const [inspections, setInspections] = useState([]);
   const [maintenances, setMaintenances] = useState([]);
@@ -110,7 +111,11 @@ const Vehicles = () => {
     setLoadingDetail(false);
   };
 
-  useEffect(() => { fetchVehicles(); }, []);
+  useEffect(() => {
+    fetchVehicles();
+    supabase.from('employees').select('id, full_name, job_title').eq('company_id', cid).eq('status', 'Aktif').order('full_name')
+      .then(({ data }) => setEmployees(data || []));
+  }, []);
 
   const openDetail = (v) => {
     setSelectedVehicle(v);
@@ -702,7 +707,13 @@ const Vehicles = () => {
               <IG label="Araç Model *" placeholder="Actros, Transit..." value={newVehicle.model} onChange={e => setNewVehicle({ ...newVehicle, model: e.target.value })} error={addErr.model} />
               <IG label="Model Yılı" placeholder="2023" value={newVehicle.model_year} onChange={e => setNewVehicle({ ...newVehicle, model_year: e.target.value })} />
               <IG label="Şasi No (VIN)" placeholder="Opsiyonel" value={newVehicle.vin_no} onChange={e => setNewVehicle({ ...newVehicle, vin_no: e.target.value })} />
-              <IG label="Sürücü" placeholder="Ad Soyad" value={newVehicle.driver_name} onChange={e => setNewVehicle({ ...newVehicle, driver_name: e.target.value })} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label className="label-sm">Sürücü</label>
+                <select className="input" value={newVehicle.driver_name} onChange={e => setNewVehicle({ ...newVehicle, driver_name: e.target.value })}>
+                  <option value="">— Sürücü Seçiniz —</option>
+                  {employees.map(emp => <option key={emp.id} value={emp.full_name}>{emp.full_name}{emp.job_title ? ` (${emp.job_title})` : ''}</option>)}
+                </select>
+              </div>
             </div>
 
             <SectionLabel>Teknik Detaylar</SectionLabel>
@@ -770,7 +781,13 @@ const Vehicles = () => {
               <IG label="Araç Model *" placeholder="Actros, Transit..." value={editRecord.model || ''} onChange={e => setEditRecord({ ...editRecord, model: e.target.value })} error={editErr.model} />
               <IG label="Model Yılı" value={editRecord.model_year || ''} onChange={e => setEditRecord({ ...editRecord, model_year: e.target.value })} />
               <IG label="Şasi No (VIN)" value={editRecord.vin_no || ''} onChange={e => setEditRecord({ ...editRecord, vin_no: e.target.value })} />
-              <IG label="Sürücü" value={editRecord.driver_name || ''} onChange={e => setEditRecord({ ...editRecord, driver_name: e.target.value })} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label className="label-sm">Sürücü</label>
+                <select className="input" value={editRecord.driver_name || ''} onChange={e => setEditRecord({ ...editRecord, driver_name: e.target.value })}>
+                  <option value="">— Sürücü Seçiniz —</option>
+                  {employees.map(emp => <option key={emp.id} value={emp.full_name}>{emp.full_name}{emp.job_title ? ` (${emp.job_title})` : ''}</option>)}
+                </select>
+              </div>
             </div>
 
             <SectionLabel>Teknik Detaylar</SectionLabel>

@@ -4,6 +4,7 @@ import {
   Truck, Fuel, Disc, FileSpreadsheet, Briefcase, ShoppingCart,
   TrendingDown, FileText, BarChart3, Bell, RefreshCcw, ShieldCheck,
   FolderOpen, PieChart, LogOut, ChevronDown, ChevronRight, MessageCircle, TrendingUp,
+  UserCheck, ClipboardList, ArrowLeftRight,
 } from 'lucide-react';
 import useAuthStore, { ROLE_DISPLAY_META } from '../store/authStore';
 import { supabase } from '../lib/supabase';
@@ -39,7 +40,9 @@ const NAV_GROUPS = [
   {
     label: 'İnsan Kaynakları',
     items: [
-      { icon: <Briefcase size={18} />,       label: 'Personel & Puantaj', tab: 'personnel' },
+      { icon: <UserCheck size={18} />,       label: 'Personel Tanımlama',     tab: 'personnel_def' },
+      { icon: <ClipboardList size={18} />,   label: 'Pusula & Puantaj',        tab: 'personnel_payroll' },
+      { icon: <ArrowLeftRight size={18} />,  label: 'Pozisyon Değişikliği',    tab: 'personnel_pos' },
     ],
   },
   {
