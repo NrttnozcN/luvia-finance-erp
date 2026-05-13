@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Plus, Search, Trash2, Edit2, ChevronRight,
   Package, Wallet, X, Shield, Users, FolderOpen,
   Eye, EyeOff, Pencil, CheckSquare, Square,
-  DollarSign,
+  DollarSign, Upload, FileSpreadsheet,
 } from 'lucide-react';
+// xlsx dinamik import — yalnızca kullanıldığında yüklenir
+const getXLSX = () => import('xlsx');
 import { supabase } from '../lib/supabase';
 import useAuthStore, { MODULE_MATRIX, MODULE_LABELS } from '../store/authStore';
 
@@ -24,7 +26,9 @@ const Definitions = () => {
   const [materials, setMaterials]         = useState([]);
   const [showMatModal, setShowMatModal]   = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
-  const [bulkText, setBulkText]           = useState('');
+  const [bulkPreview, setBulkPreview]     = useState([]);
+  const [bulkFileName, setBulkFileName]   = useState('');
+  const fileInputRef                      = useRef(null);
   const [matForm, setMatForm]             = useState({ name: '', category: 'Gider', unit: 'Adet', item_type: 'Gider' });
 
   // ── Kasalar ──
@@ -120,51 +124,65 @@ const Definitions = () => {
     fetchMaterials(activeTab === 'gider' ? 'Gider' : 'Malzeme');
   };
 
+  const handleExcelFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setBulkFileName(file.name);
+    const XLSX = await getXLSX();
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    const isHeader = rows[0] && String(rows[0][0]).toLowerCase().includes('ad');
+    const dataRows = isHeader ? rows.slice(1) : rows;
+    const items = dataRows
+      .filter(r => String(r[0] || '').trim())
+      .map(r => ({
+        name:       String(r[0] || '').trim(),
+        category:   String(r[1] || '').trim() || (activeTab === 'gider' ? 'Gider' : 'Yedek Parça'),
+        unit:       String(r[2] || '').trim() || 'Adet',
+        item_type:  activeTab === 'gider' ? 'Gider' : 'Malzeme',
+        company_id: cid,
+      }));
+    setBulkPreview(items);
+  };
+
   const handleBulkMaterialUpload = async () => {
-    if (!bulkText.trim()) { alert('Lütfen Excel verilerini yapıştırın.'); return; }
-    
+    if (bulkPreview.length === 0) { alert('Önce bir Excel dosyası seçin.'); return; }
     setLoading(true);
-    const rows = bulkText.split('\n').filter(line => line.trim());
-    const newItems = rows.map(row => {
-      const cols = row.split('\t');
-      return {
-        name: cols[0]?.trim(),
-        category: cols[1]?.trim() || (activeTab === 'gider' ? 'Gider' : 'Yedek Parça'),
-        unit: cols[2]?.trim() || 'Adet',
-        item_type: activeTab === 'gider' ? 'Gider' : 'Malzeme',
-        company_id: cid
-      };
-    }).filter(item => item.name);
-
-    if (newItems.length === 0) {
-      alert('Geçerli veri bulunamadı.');
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase.from('materials').insert(newItems);
+    const { error } = await supabase.from('materials').insert(bulkPreview);
     if (error) {
       alert('Toplu yükleme hatası: ' + error.message);
     } else {
-      alert(`${newItems.length} adet malzeme başarıyla eklendi.`);
       setShowBulkModal(false);
-      setBulkText('');
+      setBulkPreview([]);
+      setBulkFileName('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       fetchMaterials(activeTab === 'gider' ? 'Gider' : 'Malzeme');
     }
     setLoading(false);
   };
 
-  const downloadSampleExcel = () => {
-    const headers = 'Malzeme Adı\tKategori\tBirim';
-    const sample = 'Örnek Parça\tYedek Parça\tAdet\nÖrnek Yağ\tYağ & Filtre\tLitre';
-    const content = headers + '\n' + sample;
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'ornek_malzeme_listesi.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadSampleExcel = async () => {
+    const XLSX = await getXLSX();
+    const isGider = activeTab === 'gider';
+    const wb = XLSX.utils.book_new();
+    const data = [
+      ['Malzeme Adı', 'Kategori', 'Birim'],
+      isGider
+        ? ['Ofis Kırtasiyesi', 'Kırtasiye', 'Adet']
+        : ['Fren Balatası', 'Yedek Parça', 'Adet'],
+      isGider
+        ? ['Yemek Gideri', 'İkram', 'Adet']
+        : ['Motor Yağı 15W40', 'Yağ & Filtre', 'Litre'],
+      isGider
+        ? ['Akaryakıt', 'Gider', 'Litre']
+        : ['Lastik 315/80R22', 'Lastik', 'Adet'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Malzemeler');
+    XLSX.writeFile(wb, `ornek_${isGider ? 'gider' : 'malzeme'}_listesi.xlsx`);
   };
 
   const handleDeleteMaterial = async (id) => {
@@ -756,38 +774,83 @@ const Definitions = () => {
       {/* TOPLU YÜKLEME MODALI */}
       {showBulkModal && (
         <div style={overlay}>
-          <div className="card" style={{ ...modal, maxWidth: '600px' }}>
+          <div className="card" style={{ ...modal, maxWidth: '620px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem' }}>Toplu Malzeme Yükle (Excel'den)</h2>
-                <p className="text-muted" style={{ fontSize: '0.8rem' }}>Excel'deki sütunları seçip buraya yapıştırın.</p>
+                <h2 style={{ fontSize: '1.25rem' }}>Toplu Malzeme Yükle</h2>
+                <p className="text-muted" style={{ fontSize: '0.8rem' }}>Excel dosyasından toplu malzeme içe aktarın.</p>
               </div>
-              <button onClick={() => setShowBulkModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+              <button onClick={() => { setShowBulkModal(false); setBulkPreview([]); setBulkFileName(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
             </div>
-            
-            <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
-              <p style={{ fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem' }}>Format Nasıl Olmalı?</p>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: '1.5' }}>
-                Excel'de sırasıyla <strong>Ad | Kategori | Birim</strong> sütunlarını kopyalayıp aşağıdaki kutuya yapıştırın. <br/>
-                Örn: <code style={{ color: 'var(--primary)' }}>Fren Balatası [TAB] Yedek Parça [TAB] Adet</code>
-              </p>
-              <button className="btn btn-ghost" onClick={downloadSampleExcel} style={{ fontSize: '0.75rem', marginTop: '0.5rem', padding: '0.4rem 0.75rem' }}>
-                📄 Örnek Dosyayı İndir
+
+            {/* Adım 1: Şablon indir */}
+            <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: '12px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <FileSpreadsheet size={28} style={{ color: '#16a34a', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '0.85rem', fontWeight: '700' }}>1. Adım — Şablonu İndir</p>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Ad, Kategori, Birim sütunlu hazır Excel şablonunu indir ve doldur.</p>
+              </div>
+              <button className="btn btn-ghost" onClick={downloadSampleExcel} style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                📥 Şablon İndir
               </button>
             </div>
 
-            <textarea
-              className="input"
-              style={{ minHeight: '200px', fontFamily: 'monospace', fontSize: '0.85rem', marginBottom: '1.5rem', resize: 'vertical' }}
-              placeholder="Excel'den kopyaladığınız satırları buraya yapıştırın..."
-              value={bulkText}
-              onChange={e => setBulkText(e.target.value)}
-            />
+            {/* Adım 2: Dosya seç */}
+            <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: '12px', marginBottom: '1.25rem' }}>
+              <p style={{ fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.75rem' }}>2. Adım — Excel Dosyasını Seç</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleExcelFile}
+                style={{ display: 'none' }}
+              />
+              <button
+                className="btn btn-ghost"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ width: '100%', padding: '0.85rem', border: '2px dashed var(--border)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+              >
+                <Upload size={18} />
+                {bulkFileName ? bulkFileName : 'Dosya seç (.xlsx)'}
+              </button>
+            </div>
+
+            {/* Önizleme */}
+            {bulkPreview.length > 0 && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <p style={{ fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', color: '#16a34a' }}>
+                  ✓ {bulkPreview.length} satır okundu — önizleme:
+                </p>
+                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.78rem' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-main)' }}>
+                        {['Ad', 'Kategori', 'Birim'].map(h => (
+                          <th key={h} style={{ padding: '0.4rem 0.75rem', textAlign: 'left', fontWeight: '700', color: 'var(--text-dim)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkPreview.slice(0, 8).map((r, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid var(--bg-main)' }}>
+                          <td style={{ padding: '0.4rem 0.75rem' }}>{r.name}</td>
+                          <td style={{ padding: '0.4rem 0.75rem', color: 'var(--text-dim)' }}>{r.category}</td>
+                          <td style={{ padding: '0.4rem 0.75rem', color: 'var(--text-dim)' }}>{r.unit}</td>
+                        </tr>
+                      ))}
+                      {bulkPreview.length > 8 && (
+                        <tr><td colSpan={3} style={{ padding: '0.4rem 0.75rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>...ve {bulkPreview.length - 8} satır daha</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost" onClick={() => setShowBulkModal(false)}>İptal</button>
-              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleBulkMaterialUpload} disabled={loading}>
-                {loading ? 'Yükleniyor...' : `🚀 ${bulkText.split('\n').filter(l => l.trim()).length} Satırı Yükle`}
+              <button className="btn btn-ghost" onClick={() => { setShowBulkModal(false); setBulkPreview([]); setBulkFileName(''); }}>İptal</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleBulkMaterialUpload} disabled={loading || bulkPreview.length === 0}>
+                {loading ? 'Yükleniyor...' : `🚀 ${bulkPreview.length} Malzemeyi Kaydet`}
               </button>
             </div>
           </div>
