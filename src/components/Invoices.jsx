@@ -140,6 +140,7 @@ const Invoices = ({ initialView = 'list' }) => {
         description: newInvoice.description,
         islem_turu: newInvoice.islem_turu,
         fatura_tipi: newInvoice.fatura_tipi,
+        company_id: cid,
       }])
       .select();
 
