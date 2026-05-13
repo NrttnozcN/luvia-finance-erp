@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Building2, Plus, X, AlertTriangle, Edit2, CheckCircle, XCircle, Calendar, Users } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Building2, Plus, X, AlertTriangle, Edit2, CheckCircle, XCircle, Calendar } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const daysUntil = (d) => {

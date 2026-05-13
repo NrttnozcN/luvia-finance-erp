@@ -1,17 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Disc, 
-  Plus, 
-  Search, 
-  Settings as SettingsIcon, 
-  Truck, 
-  Calendar, 
-  History, 
-  Wrench, 
-  ChevronRight, 
+import { useState, useEffect } from 'react';
+import {
+  Disc,
+  Plus,
+  Truck,
   MoreVertical,
-  AlertTriangle,
-  X
+  X,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';

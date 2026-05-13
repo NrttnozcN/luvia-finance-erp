@@ -1,19 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
-  Users, 
   Plus, 
-  Search, 
-  Filter, 
   Building2, 
-  Mail, 
   Phone, 
-  MapPin, 
   MoreVertical, 
-  ChevronRight, 
-  Download,
   X,
-  User,
-  Wallet
+  User
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
@@ -33,7 +25,7 @@ const Customers = () => {
   const [totalAlacak, setTotalAlacak] = useState(0);
   const [totalBorc, setTotalBorc] = useState(0);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     setLoading(true);
     const [{ data: custs }, { data: invs }, { data: txns }, { data: chks }] = await Promise.all([
       supabase.from('customers').select('*').eq('company_id', cid).order('name'),
@@ -63,11 +55,11 @@ const Customers = () => {
     setTotalAlacak(enriched.filter(c => c.computedBalance < 0).reduce((s, c) => s + Math.abs(c.computedBalance), 0));
     setTotalBorc(enriched.filter(c => c.computedBalance > 0).reduce((s, c) => s + c.computedBalance, 0));
     setLoading(false);
-  };
+  }, [cid]);
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [fetchCustomers]);
 
   const handleSave = async () => {
     const { error } = await supabase.from('customers').insert([{ ...newCustomer, company_id: cid }]);

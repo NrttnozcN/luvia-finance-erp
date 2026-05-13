@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, Receipt, Package, Settings, Building2, Wallet,
-  Truck, Fuel, Disc, FileSpreadsheet, Briefcase, History, ShoppingCart,
+  Truck, Fuel, Disc, FileSpreadsheet, Briefcase, ShoppingCart,
   TrendingDown, FileText, BarChart3, Bell, RefreshCcw, ShieldCheck,
   FolderOpen, PieChart, LogOut, ChevronDown, ChevronRight, MessageCircle, TrendingUp,
 } from 'lucide-react';

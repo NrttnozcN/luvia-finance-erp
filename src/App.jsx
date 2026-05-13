@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Vehicles from './components/Vehicles';
 import Customers from './components/Customers';
@@ -29,8 +29,6 @@ import {
   Bell, 
   Search, 
   Plus, 
-  TrendingUp, 
-  TrendingDown, 
   DollarSign, 
   Truck, 
   Fuel as FuelIcon, 
@@ -42,7 +40,7 @@ import {
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
-import useAuthStore, { ROLE_DISPLAY_META } from './store/authStore';
+import useAuthStore from './store/authStore';
 
 const daysUntil = (d) => d ? Math.ceil((new Date(d) - new Date()) / 86400000) : null;
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
@@ -76,12 +74,10 @@ const App = () => {
     fuelCost: 0,
     pendingInvoices: 0
   });
-  const [loading, setLoading] = useState(true);
   const [upcomingAlerts, setUpcomingAlerts] = useState([]);
 
   // SQL'DEN GERÇEK İSTATİSTİKLERİ ÇEK
   const fetchDashboardStats = async () => {
-    setLoading(true);
     
     // 1. Toplam Satış (Faturalar)
     const { data: invs } = await supabase.from('invoices').select('total_amount');
@@ -104,7 +100,6 @@ const App = () => {
       fuelCost,
       pendingInvoices: invs?.length || 0
     });
-    setLoading(false);
   };
 
   const fetchUpcomingAlerts = async () => {

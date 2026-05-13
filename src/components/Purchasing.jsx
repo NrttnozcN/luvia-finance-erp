@@ -1,17 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  ShoppingCart, 
-  Plus, 
-  Search, 
-  Filter, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
-  MoreVertical, 
-  ChevronRight,
+import { useState, useEffect } from 'react';
+import {
+  ShoppingCart,
+  Plus,
+  AlertCircle,
+  MoreVertical,
   X,
-  Package,
-  Calendar
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Truck, Plus, MoreVertical, CheckCircle2, ShieldCheck,
-  ArrowLeft, Trash2, X, Gauge, Building2
+  Truck, Plus, MoreVertical, CheckCircle2,
+  ArrowLeft, Trash2, X, Gauge, Building2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';

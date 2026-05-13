@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { BarChart3, TrendingDown, Truck, Users, Wrench } from 'lucide-react';
 import { Fuel } from 'lucide-react';
 import {
@@ -7,7 +7,6 @@ import {
 } from 'recharts';
 import { supabase } from '../lib/supabase';
 
-const COLORS = ['var(--primary)', '#64748b', '#94a3b8'];
 const fmt = (v) => `₺${Number(v || 0).toLocaleString('tr-TR')}`;
 
 const CostReports = () => {
@@ -15,11 +14,8 @@ const CostReports = () => {
   const [invoices, setInvoices] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [personnel, setPersonnel] = useState([]);
-  const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     const fetchAll = async () => {
-      setLoading(true);
       const [
         { data: fuels },
         { data: invs },
@@ -35,7 +31,6 @@ const CostReports = () => {
       setInvoices(invs || []);
       setVehicles(vehs || []);
       setPersonnel(persList || []);
-      setLoading(false);
     };
     fetchAll();
   }, []);

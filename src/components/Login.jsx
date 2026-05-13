@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, LogIn, Lock, Mail, ShieldCheck, Zap, BarChart3 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Eye, EyeOff, LogIn, Lock, Mail, ShieldCheck } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 
 const FEATURES = [
@@ -39,14 +39,6 @@ const Login = () => {
     } else {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (ql) => {
-    clearError();
-    setEmail(ql.email);
-    setPassword('123456');
-    setLoading(true);
-    setTimeout(() => { login(ql.email, '123456'); setLoading(false); }, 300);
   };
 
   const inputStyle = (hasError) => ({

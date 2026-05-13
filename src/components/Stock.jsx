@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Package, Plus, ArrowUpRight, ArrowDownLeft,
-  MoreVertical, X, AlertTriangle, Warehouse
+  MoreVertical, X, AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';

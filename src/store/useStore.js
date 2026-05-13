@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { genId, genInvoiceNo, calcInvoiceTotals, today } from '../utils/formatters';
+import { genId, genInvoiceNo, today } from '../utils/formatters';
 
 // ─── Başlangıç verileri ───────────────────────────────────────────────────────
 
@@ -115,10 +115,9 @@ const ACCOUNTS_CHART = {
 
 // ─── Çift Taraflı Muhasebe Kaydı Üretici ─────────────────────────────────────
 
-export const buildInvoiceEntries = (invoice, customerType) => {
+export const buildInvoiceEntries = (invoice) => {
   const { subtotal, vatAmount, total, type } = invoice;
   const isSales = type === 'Satış Faturası';
-  const isService = type === 'Hizmet Alımı';
   const entries = [];
 
   if (isSales) {
@@ -198,7 +197,7 @@ const useStore = create((set, get) => ({
     const prefix = invoiceData.type === 'Satış Faturası' ? 'SAT' : 'ALI';
     const no = genInvoiceNo(prefix, nos);
     const customer = get().customers.find(c => c.id === invoiceData.customerId);
-    const entries = buildInvoiceEntries(invoiceData, customer?.type);
+    const entries = buildInvoiceEntries(invoiceData);
     const newInvoice = { ...invoiceData, id: genId(), no, status: 'unpaid', payments: [], entries };
 
     // Stok girişi: fatura → depo ise stok güncelle
@@ -240,64 +239,40 @@ const useStore = create((set, get) => ({
   // Fatura ödemesi kaydet
   addInvoicePayment: (invoiceId, paymentData) => {
     set(s => {
-      const invoices = s.invoices.map(inv => {
-        if (inv.id !== invoiceId) return inv;
-        const newPayment = { ...paymentData, id: genId() };
-        const payments = [...inv.payments, newPayment];
-        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-        const status = totalPaid >= inv.total ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
-
-        // Kasa/banka güncelle
-        const accounts = s.accounts.map(acc => {
-          if (acc.id !== paymentData.accountId) return acc;
-          const delta = inv.type === 'Satış Faturası' ? paymentData.amount : -paymentData.amount;
-          return { ...acc, balance: acc.balance + delta };
-        });
-
-        // Muhasebe fişi
-        const payEntries = buildPaymentEntries(newPayment, inv.type);
-        const ledgerEntry = {
-          id: genId(),
-          date: paymentData.date,
-          ref: `ODE-${inv.no}`,
-          type: 'Ödeme',
-          desc: `Ödeme: ${inv.no}`,
-          entries: payEntries,
-        };
-
-        return {
-          ...s,
-          invoices: s.invoices.map(i => i.id === invoiceId ? { ...i, payments, status } : i),
-          accounts,
-          ledgerEntries: [...s.ledgerEntries, ledgerEntry],
-        };
-      });
-      return { invoices: s.invoices.map(inv => {
-        if (inv.id !== invoiceId) return inv;
-        const newPayment = { ...paymentData, id: genId() };
-        const payments = [...inv.payments, newPayment];
-        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-        const status = totalPaid >= inv.total ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
-        return { ...inv, payments, status };
-      })};
-    });
-
-    // Kasa ve defter işlemi ayrıca
-    set(s => {
       const inv = s.invoices.find(i => i.id === invoiceId);
-      if (!inv) return {};
-      const newPayment = s.invoices.find(i => i.id === invoiceId)?.payments.slice(-1)[0];
+      if (!inv) return s;
+
+      const newPayment = { ...paymentData, id: genId() };
+      const payments = [...inv.payments, newPayment];
+      const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+      const status = totalPaid >= inv.total ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
+
+      const updatedInvoices = s.invoices.map(i => i.id === invoiceId ? { ...i, payments, status } : i);
+
+      // Kasa/banka güncelle
       const accounts = s.accounts.map(acc => {
         if (acc.id !== paymentData.accountId) return acc;
         const delta = inv.type === 'Satış Faturası' ? paymentData.amount : -paymentData.amount;
         return { ...acc, balance: acc.balance + delta };
       });
-      const payEntries = buildPaymentEntries({ ...paymentData, id: 'x' }, inv.type);
+
+      // Muhasebe fişi
+      const payEntries = buildPaymentEntries(newPayment, inv.type);
       const ledgerEntry = {
-        id: genId(), date: paymentData.date, ref: `ODE-${inv.no}`,
-        type: 'Ödeme', desc: `Ödeme: ${inv.no}`, entries: payEntries,
+        id: genId(),
+        date: paymentData.date,
+        ref: `ODE-${inv.no}`,
+        type: 'Ödeme',
+        desc: `Ödeme: ${inv.no}`,
+        entries: payEntries,
       };
-      return { accounts, ledgerEntries: [...s.ledgerEntries, ledgerEntry] };
+
+      return {
+        ...s,
+        invoices: updatedInvoices,
+        accounts,
+        ledgerEntries: [...s.ledgerEntries, ledgerEntry],
+      };
     });
   },
 
@@ -306,7 +281,7 @@ const useStore = create((set, get) => ({
     stockItems: [...s.stockItems, { ...data, id: genId(), qty: parseFloat(data.qty) || 0 }]
   })),
 
-  addStockMovement: ({ itemName, qty, type, ref, note }) => {
+  addStockMovement: ({ itemName, qty, type }) => {
     set(s => ({
       stockItems: s.stockItems.map(item => {
         if (item.name !== itemName) return item;
@@ -479,7 +454,7 @@ const useStore = create((set, get) => ({
 
   // Uyarı merkezi için tüm kritik durumlar
   getAlerts: () => {
-    const { invoices, vehicles, stockItems, personnel } = get();
+    const { invoices, vehicles, stockItems } = get();
     const today_ = today();
     const in7Days = new Date(Date.now() + 7 * 864e5).toISOString().split('T')[0];
     const in30Days = new Date(Date.now() + 30 * 864e5).toISOString().split('T')[0];
@@ -512,7 +487,11 @@ const useStore = create((set, get) => ({
       }
     });
 
-    return alerts.sort((a, b) => (a.type === 'danger' ? -1 : 1));
+    return alerts.sort((a, b) => {
+      if (a.type === 'danger' && b.type !== 'danger') return -1;
+      if (a.type !== 'danger' && b.type === 'danger') return 1;
+      return 0;
+    });
   },
 
   // Genel arama

@@ -52,9 +52,10 @@ const useAuthStore = create(
       login: async (identifier, password) => {
         const cleanId = identifier.trim().toLowerCase();
 
+        // 1) Kullanıcıyı şifre ile bul (companies join, roles ayrı sorgu)
         const { data: users, error } = await supabase
           .from('profiles')
-          .select('*, companies(*), roles(name, permissions)')
+          .select('*, companies(*)')
           .eq('password', password);
 
         if (error || !users || users.length === 0) {
@@ -87,6 +88,17 @@ const useAuthStore = create(
           }
         }
 
+        // 2) role_id varsa roles tablosundan ayrıca çek (FK yoksa hata vermez)
+        let roleInfo = null;
+        if (user.role_id) {
+          const { data: rd } = await supabase
+            .from('roles')
+            .select('name, permissions')
+            .eq('id', user.role_id)
+            .single();
+          roleInfo = rd || null;
+        }
+
         const safeUser = {
           id:          user.id,
           name:        user.full_name,
@@ -94,8 +106,8 @@ const useAuthStore = create(
           email:       user.email,
           role:        user.role,
           role_id:     user.role_id || null,
-          roleLabel:   user.roles?.name || ROLE_DISPLAY_META[user.role]?.label || user.role,
-          permissions: user.roles?.permissions || null,
+          roleLabel:   roleInfo?.name || ROLE_DISPLAY_META[user.role]?.label || user.role,
+          permissions: roleInfo?.permissions || null,
           company_id:  user.company_id || null,
           companyName: user.companies?.name || null,
           status:      'active',

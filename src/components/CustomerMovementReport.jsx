@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Download, FileSearch } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, FileSearch } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
 

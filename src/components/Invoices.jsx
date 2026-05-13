@@ -1,22 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  FileText, 
-  Plus, 
-  Search, 
-  Filter, 
-  ChevronRight, 
-  MoreVertical, 
+import { useState, useEffect } from 'react';
+import {
+  Plus,
+  MoreVertical,
   ArrowLeft,
   Save,
   Trash2,
-  Calendar,
   Building2,
-  Box,
   Truck,
   Warehouse,
-  CheckCircle2,
-  Clock,
-  ChevronDown
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
@@ -449,8 +440,5 @@ const InputGroup = ({ label, placeholder, type, value, onChange }) => (
     <input type={type || 'text'} className="input" placeholder={placeholder} value={value} onChange={onChange} />
   </div>
 );
-
-const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' };
-const modalContentStyle = { width: '100%', maxWidth: '650px', padding: '2rem' };
 
 export default Invoices;

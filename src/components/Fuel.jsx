@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Fuel as FuelIcon, Plus, MoreVertical, X,
+  Plus, MoreVertical, X,
   ArrowRightLeft, Building2, Filter, Droplets,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';

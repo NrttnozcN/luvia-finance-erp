@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  FileText, Plus, Search, Upload, Download, Trash2,
+  FileText, Search, Upload, Download, Trash2,
   FolderOpen, FileImage, FileArchive, File, X, HardDrive,
   Calendar, User,
 } from 'lucide-react';

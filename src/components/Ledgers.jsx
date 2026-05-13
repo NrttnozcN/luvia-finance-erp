@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  BookOpen, Download, Printer, Table, Users, Wallet, Building2, History,
+  Download, Printer, Table, Users, Wallet, Building2, History,
   FileSpreadsheet, Search,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -19,7 +19,6 @@ const EmptyState = ({ icon, title, description }) => (
 
 const Ledgers = () => {
   const [invoices, setInvoices] = useState([]);
-  const [customers, setCustomers] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,17 +34,14 @@ const Ledgers = () => {
       setLoading(true);
       const [
         { data: invs },
-        { data: custs },
         { data: trans },
         { data: mats },
       ] = await Promise.all([
         supabase.from('invoices').select('*, customers(name)').order('date', { ascending: false }),
-        supabase.from('customers').select('id, name, balance').order('name'),
         supabase.from('finance_transactions').select('*').order('created_at', { ascending: false }),
         supabase.from('materials').select('*').order('name'),
       ]);
       setInvoices(invs || []);
-      setCustomers(custs || []);
       setTransactions(trans || []);
       setMaterials(mats || []);
       setLoading(false);

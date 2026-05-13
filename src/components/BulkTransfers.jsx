@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { RefreshCcw, Package, Users, Wallet, Building2, CheckCircle2, ShieldAlert, Play, History } from 'lucide-react';
 import { supabase } from '../lib/supabase';

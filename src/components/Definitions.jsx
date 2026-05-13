@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Plus, Search, Trash2, Edit2, ChevronRight,
-  Tag, Package, Wallet, X, Shield, Users, FolderOpen,
-  Eye, EyeOff, Lock, Save, Pencil, CheckSquare, Square,
+  Package, Wallet, X, Shield, Users, FolderOpen,
+  Eye, EyeOff, Pencil, CheckSquare, Square,
   DollarSign,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';

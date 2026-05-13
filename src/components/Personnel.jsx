@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Users, Search, Pencil, X, ChevronLeft, ChevronRight,
   Calendar, Plus, Trash2, Save,

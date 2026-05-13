@@ -1,18 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  CreditCard, 
-  Plus, 
-  Search, 
-  Calendar, 
-  Building2, 
-  MoreVertical, 
-  ChevronRight, 
-  ArrowUpRight, 
-  ArrowDownLeft,
+import { useState, useEffect } from 'react';
+import {
+  CreditCard,
+  Plus,
+  Calendar,
+  MoreVertical,
   X,
-  Clock,
-  CheckCircle2,
-  AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';

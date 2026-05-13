@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { MessageCircle, CheckCircle, Clock, ChevronLeft, Send, Plus, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { MessageCircle, CheckCircle, Clock, ChevronLeft, Send } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
 
