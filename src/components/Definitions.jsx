@@ -375,6 +375,17 @@ const Definitions = () => {
     setShowMatModal(true);
   };
 
+  const handleOpenAddModal = () => {
+    setMatForm({
+      name: '', 
+      unit: 'Adet', 
+      item_type: activeTab === 'gider' ? 'Gider' : 'Malzeme',
+      account_card: (activeTab === 'gider' ? drillCard : '') || '',
+      category: (activeTab === 'gider' ? drillCat : drillCard) || '',
+    });
+    setShowMatModal(true);
+  };
+
   const ADD_LABELS = {
     gider: 'Yeni Gider Kartı', malzeme: 'Yeni Malzeme',
     kasalar: 'Yeni Kasa Ekle', users: 'Yeni Kullanıcı',
@@ -546,7 +557,7 @@ const Definitions = () => {
                       <div onClick={handleOpenAddModal}
                         style={{ padding: '1.1rem', borderRadius: '12px', border: '2px dashed var(--border)',
                           background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                          gap: '0.75rem', transition: 'all 0.18s', color: 'var(--primary)' }}
+                          gap: '0.75rem', transition: 'all 0.18s', color: 'var(--primary)' }}>
                         onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary-light)'; e.currentTarget.style.borderColor = 'var(--primary)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; }}>
                         <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
