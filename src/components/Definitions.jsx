@@ -410,12 +410,11 @@ const Definitions = () => {
             </button>
           )}
           {/* Gider/Malzeme için buton grid içinde; diğer sekmeler için başlıkta */}
-          {ADD_LABELS[activeTab] && activeTab !== 'gider' && activeTab !== 'malzeme' && (
+          {ADD_LABELS[activeTab] && (
             <button className="btn btn-primary" onClick={handleAddClick}>
               <Plus size={20} /> {ADD_LABELS[activeTab]}
             </button>
-          )}
-        </div>
+          )}</div>
       </header>
 
       <div style={{ display: 'flex', gap: '2rem' }}>
@@ -793,18 +792,20 @@ const Definitions = () => {
       {/* Malzeme/Gider Modal — Stepped */}
       {showMatModal && (() => {
         const isGider    = activeTab === 'gider';
-        const cardLocked = isGider ? !!drillCard : !!drillCard; // drillCard = category for malzeme
-        const catLocked  = isGider && !!drillCat;
-        const cardMeta   = CARD_META[isGider ? drillCard : drillCard] || {};
+        // Sadece modal contextual butondan açıldıysa kilitli kalsın, tepedeki ana butondan açıldıysa (forcedContext false ise) kilitleri aç
+        const cardLocked = isGider ? !!matForm.account_card : !!matForm.category;
+        const catLocked  = isGider && !!matForm.category;
+        const currentContext = isGider ? matForm.account_card : matForm.category;
+        const cardMeta   = CARD_META[currentContext] || {};
 
         const step1Label = isGider ? 'Hesap Kartı' : 'Kategori';
         const step1Value = isGider ? matForm.account_card : matForm.category;
         const step1Locked = cardLocked;
-        const step1LockedVal = drillCard;
+        const step1LockedVal = isGider ? matForm.account_card : matForm.category;
 
         // Step 2 visible only for gider (category)
         const step2Locked = catLocked;
-        const step2LockedVal = drillCat;
+        const step2LockedVal = matForm.category;
 
         // Final step number
         const finalStepNum = isGider ? 3 : 2;
