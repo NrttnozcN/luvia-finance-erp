@@ -236,18 +236,14 @@ const TransactionModal = ({ title, form, setForm, onClose, onSave, saveLabel, fa
   const fallbackCards  = isGider ? giderFallback : gelirFallback;
   const cardOptions    = availableCards.length > 0 ? availableCards.map(c => c.name) : fallbackCards;
 
-  // Kategori ve malzeme listelerini item_type'tan bağımsız hesapla
-  // (kullanıcı henüz Gider/Gelir tipinde malzeme eklememiş olabilir)
+  // Kategori: tüm malzemelerin unique kategorileri (account_card eşleşmesi zorunlu değil)
   const categoryOptions = [...new Set(
-    materialsList
-      .filter(m => !form.account_card || m.account_card === form.account_card)
-      .map(m => m.category)
-      .filter(Boolean)
+    materialsList.map(m => m.category).filter(Boolean)
   )].sort();
 
+  // Malzeme: kategori seçiliyse o kategorideki tüm malzemeler
   const filteredMats = materialsList.filter(m =>
-    (!form.account_card || m.account_card === form.account_card) &&
-    (!form.category    || m.category     === form.category)
+    !form.category || m.category === form.category
   );
 
   const Step = ({ num, label, done, children }) => (
@@ -306,17 +302,11 @@ const TransactionModal = ({ title, form, setForm, onClose, onSave, saveLabel, fa
 
           {/* ADIM 3 — Kategori */}
           <Step num={3} label="Kategori" done={!!form.category}>
-            {categoryOptions.length > 0 ? (
-              <select className="input" value={form.category || ''} disabled={!form.account_card}
-                onChange={e => setForm({ ...form, category: e.target.value, material_id: '' })}>
-                <option value="">Seçiniz...</option>
-                {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            ) : (
-              <input type="text" className="input" placeholder="Kategori yazın..." value={form.category || ''}
-                disabled={!form.account_card}
-                onChange={e => setForm({ ...form, category: e.target.value, material_id: '' })} />
-            )}
+            <select className="input" value={form.category || ''} disabled={!form.account_card}
+              onChange={e => setForm({ ...form, category: e.target.value, material_id: '' })}>
+              <option value="">Seçiniz...</option>
+              {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
             {!form.account_card && <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>Önce hesap kartı seçin</p>}
           </Step>
 
