@@ -409,12 +409,10 @@ const Definitions = () => {
               📥 Toplu Yükle
             </button>
           )}
-          {/* Gider/Malzeme için buton grid içinde; diğer sekmeler için başlıkta */}
-          {ADD_LABELS[activeTab] && (
-            <button className="btn btn-primary" onClick={handleAddClick}>
-              <Plus size={20} /> {ADD_LABELS[activeTab]}
-            </button>
-          )}</div>
+          <button className="btn btn-primary" onClick={handleAddClick}>
+            <Plus size={20} /> {ADD_LABELS[activeTab]}
+          </button>
+        </div>
       </header>
 
       <div style={{ display: 'flex', gap: '2rem' }}>
@@ -445,14 +443,20 @@ const Definitions = () => {
               // Malzeme: Level0=category, Level1=malzeme listesi
               const level2List = (() => {
                 if (isGider) {
-                  const base = drillCard ? materials.filter(m => m.account_card === drillCard) : [];
-                  return drillCat ? base.filter(m => m.category === drillCat) : [];
+                  // Eğer drillCard 'Diğer Giderler' ise, account_card'ı null veya boş olanları da getir
+                  const base = drillCard 
+                    ? materials.filter(m => (m.account_card === drillCard) || (drillCard === 'Diğer Giderler' && !m.account_card)) 
+                    : [];
+                  return drillCat ? base.filter(m => m.category === drillCat) : base;
                 }
-                return drillCard ? materials.filter(m => m.category === drillCard) : [];
+                // Malzemeler için de benzer mantık: Eğer 'Diğer' ise category'si boş olanları da göster
+                return drillCard 
+                  ? materials.filter(m => (m.category === drillCard) || (drillCard === 'Diğer' && !m.category)) 
+                  : [];
               })();
 
               const uniqueCatsUnderCard = drillCard && isGider
-                ? [...new Set(materials.filter(m => m.account_card === drillCard && m.category).map(m => m.category))]
+                ? [...new Set(materials.filter(m => (m.account_card === drillCard || (!m.account_card && drillCard === 'Diğer Giderler')) && m.category).map(m => m.category))]
                 : [];
 
               const showCategoryGrid  = isGider && drillCard && !drillCat;
@@ -502,9 +506,10 @@ const Definitions = () => {
                       {topCards.map(card => {
 
                         const meta  = CARD_META[card] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
-                        const count = isGider
-                          ? materials.filter(m => m.account_card === card).length
-                          : materials.filter(m => m.category === card).length;
+                        const count = materials.filter(m => {
+                          if (isGider) return m.account_card === c || (!m.account_card && c === 'Diğer Giderler');
+                          return m.category === c || (!m.category && c === 'Diğer');
+                        }).length;
                         return (
                           <div key={card} onClick={() => { setDrillCard(card); setDrillCat(null); }}
                             style={{ padding: '1.25rem', borderRadius: '14px', border: '1.5px solid', borderColor: meta.color + '33',
