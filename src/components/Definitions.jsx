@@ -364,6 +364,17 @@ const Definitions = () => {
     }
   };
 
+  const handleOpenAddModal = () => {
+    const isGider = activeTab === 'gider';
+    setMatForm({
+      name: '', unit: 'Adet',
+      item_type:    isGider ? 'Gider' : 'Malzeme',
+      account_card: isGider ? (drillCard || '') : '',
+      category:     isGider ? (drillCat || '') : (drillCard || ''),
+    });
+    setShowMatModal(true);
+  };
+
   const ADD_LABELS = {
     gider: 'Yeni Gider Kartı', malzeme: 'Yeni Malzeme',
     kasalar: 'Yeni Kasa Ekle', users: 'Yeni Kullanıcı',
@@ -387,12 +398,11 @@ const Definitions = () => {
               📥 Toplu Yükle
             </button>
           )}
-          {ADD_LABELS[activeTab] && (
-            ((activeTab === 'gider' || activeTab === 'malzeme') ? drillCard : true) && (
-              <button className="btn btn-primary" onClick={handleAddClick}>
-                <Plus size={20} /> {ADD_LABELS[activeTab]}
-              </button>
-            )
+          {/* Gider/Malzeme için buton grid içinde; diğer sekmeler için başlıkta */}
+          {ADD_LABELS[activeTab] && activeTab !== 'gider' && activeTab !== 'malzeme' && (
+            <button className="btn btn-primary" onClick={handleAddClick}>
+              <Plus size={20} /> {ADD_LABELS[activeTab]}
+            </button>
           )}
         </div>
       </header>
@@ -480,6 +490,7 @@ const Definitions = () => {
                   {!loading && showCardGrid && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
                       {topCards.map(card => {
+
                         const meta  = CARD_META[card] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
                         const count = isGider
                           ? materials.filter(m => m.account_card === card).length
@@ -512,43 +523,51 @@ const Definitions = () => {
 
                   {/* Level 1 — Kategori grid (yalnızca Gider) */}
                   {!loading && showCategoryGrid && (
-                    <>
-                      {uniqueCatsUnderCard.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>
-                          <FolderOpen size={40} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                          <p>Bu hesap kartında henüz kalem yok.</p>
-                          <p style={{ fontSize: '0.82rem' }}>Yukarıdan "Yeni Gider Kartı" butonuyla ekleyin.</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
+                      {uniqueCatsUnderCard.map(cat => {
+                        const meta  = CARD_META[cat] || { color: '#64748b', bg: '#f8fafc', emoji: '📂' };
+                        const count = materials.filter(m => m.account_card === drillCard && m.category === cat).length;
+                        return (
+                          <div key={cat} onClick={() => setDrillCat(cat)}
+                            style={{ padding: '1.1rem', borderRadius: '12px', border: '1.5px solid', borderColor: meta.color + '33',
+                              background: meta.bg, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', transition: 'box-shadow 0.18s' }}
+                            onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 14px ${meta.color}22`}
+                            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
+                            <span style={{ fontSize: '1.4rem' }}>{meta.emoji}</span>
+                            <div style={{ flex: 1 }}>
+                              <p style={{ fontWeight: '700', fontSize: '0.82rem', color: meta.color }}>{cat}</p>
+                              <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>{count} kalem</p>
+                            </div>
+                            <ChevronRight size={13} style={{ color: meta.color, flexShrink: 0 }} />
+                          </div>
+                        );
+                      })}
+                      {/* + Yeni Kalem Ekle tile */}
+                      <div onClick={handleOpenAddModal}
+                        style={{ padding: '1.1rem', borderRadius: '12px', border: '2px dashed var(--border)',
+                          background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                          gap: '0.75rem', transition: 'all 0.18s', color: 'var(--primary)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary-light)'; e.currentTarget.style.borderColor = 'var(--primary)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Plus size={18} style={{ color: 'var(--primary)' }} />
                         </div>
-                      ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
-                          {uniqueCatsUnderCard.map(cat => {
-                            const meta  = CARD_META[cat] || { color: '#64748b', bg: '#f8fafc', emoji: '📂' };
-                            const count = materials.filter(m => m.account_card === drillCard && m.category === cat).length;
-                            return (
-                              <div key={cat} onClick={() => setDrillCat(cat)}
-                                style={{ padding: '1.1rem', borderRadius: '12px', border: '1.5px solid', borderColor: meta.color + '33',
-                                  background: meta.bg, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', transition: 'box-shadow 0.18s' }}
-                                onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 14px ${meta.color}22`}
-                                onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
-                                <span style={{ fontSize: '1.4rem' }}>{meta.emoji}</span>
-                                <div style={{ flex: 1 }}>
-                                  <p style={{ fontWeight: '700', fontSize: '0.82rem', color: meta.color }}>{cat}</p>
-                                  <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>{count} kalem</p>
-                                </div>
-                                <ChevronRight size={13} style={{ color: meta.color, flexShrink: 0 }} />
-                              </div>
-                            );
-                          })}
+                        <div>
+                          <p style={{ fontWeight: '700', fontSize: '0.82rem' }}>Yeni Kalem Ekle</p>
+                          <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '2px' }}>Bu karta kalem ekle</p>
                         </div>
-                      )}
-                    </>
+                      </div>
+                    </div>
                   )}
 
                   {/* Level 2 — Malzeme listesi */}
                   {!loading && showMaterialTable && (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-                        <div className="search-box" style={{ width: '260px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '0.75rem' }}>
+                        <button className="btn btn-primary" style={{ fontSize: '0.82rem', padding: '0.55rem 1rem', flexShrink: 0 }} onClick={handleOpenAddModal}>
+                          <Plus size={15} /> Yeni Kalem Ekle
+                        </button>
+                        <div className="search-box" style={{ width: '240px' }}>
                           <Search size={15} className="text-dim" />
                           <input type="text" placeholder="Ara..." value={search} onChange={e => setSearch(e.target.value)} />
                         </div>
@@ -760,42 +779,97 @@ const Definitions = () => {
 
       {/* ═══ MODALLER ═══════════════════════════════════════════════════════════ */}
 
-      {/* Malzeme/Gider Modal */}
-      {showMatModal && (
-        <div style={overlay}>
-          <div className="card" style={modal}>
-            <ModalHeader title={activeTab === 'gider' ? 'Yeni Gider Kartı' : 'Yeni Malzeme'} onClose={() => setShowMatModal(false)} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <Field label="Tanım Adı *">
-                <input className="input" placeholder="Örn: Motor Yağı 10W-40" value={matForm.name} onChange={e => setMatForm({ ...matForm, name: e.target.value })} />
-              </Field>
-              {activeTab === 'gider' && (
-                <Field label="Hesap Kartı *">
-                  <select className="input" value={matForm.account_card} onChange={e => setMatForm({ ...matForm, account_card: e.target.value })}>
-                    <option value="">Seçiniz...</option>
-                    {GIDER_CARDS.map(c => <option key={c}>{c}</option>)}
-                  </select>
-                </Field>
-              )}
-              <Field label="Kategori">
-                {activeTab === 'gider' ? (
-                  <input className="input" placeholder="Örn: Lastik, Yağ, Bakım..." value={matForm.category} onChange={e => setMatForm({ ...matForm, category: e.target.value })} />
-                ) : (
-                  <select className="input" value={matForm.category} onChange={e => setMatForm({ ...matForm, category: e.target.value })}>
-                    {MALZEME_CATS.map(c => <option key={c}>{c}</option>)}
-                  </select>
+      {/* Malzeme/Gider Modal — Stepped */}
+      {showMatModal && (() => {
+        const isGider    = activeTab === 'gider';
+        const cardLocked = isGider ? !!drillCard : !!drillCard; // drillCard = category for malzeme
+        const catLocked  = isGider && !!drillCat;
+        const cardMeta   = CARD_META[isGider ? drillCard : drillCard] || {};
+
+        const step1Label = isGider ? 'Hesap Kartı' : 'Kategori';
+        const step1Value = isGider ? matForm.account_card : matForm.category;
+        const step1Locked = cardLocked;
+        const step1LockedVal = drillCard;
+
+        // Step 2 visible only for gider (category)
+        const step2Locked = catLocked;
+        const step2LockedVal = drillCat;
+
+        // Final step number
+        const finalStepNum = isGider ? 3 : 2;
+
+        // Is final step enabled?
+        const step1Done = isGider ? !!matForm.account_card : !!matForm.category;
+        const step2Done = !isGider || !!matForm.category;
+        const finalEnabled = step1Done && step2Done;
+
+        return (
+          <div style={overlay}>
+            <div className="card" style={{ ...modal, maxWidth: '500px' }}>
+              <ModalHeader
+                title={isGider ? 'Yeni Gider Kalemi Ekle' : 'Yeni Malzeme Ekle'}
+                onClose={() => setShowMatModal(false)}
+              />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+                {/* ADIM 1 */}
+                <StepRow num={1} label={step1Label} locked={step1Locked} lockedVal={step1LockedVal} meta={cardMeta}>
+                  {isGider ? (
+                    <select className="input" value={matForm.account_card}
+                      onChange={e => setMatForm({ ...matForm, account_card: e.target.value, category: '' })}>
+                      <option value="">Seçiniz...</option>
+                      {GIDER_CARDS.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  ) : (
+                    <select className="input" value={matForm.category}
+                      onChange={e => setMatForm({ ...matForm, category: e.target.value })}>
+                      <option value="">Seçiniz...</option>
+                      {MALZEME_CATS.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  )}
+                </StepRow>
+
+                <StepConnector active={step1Done} />
+
+                {/* ADIM 2 — sadece Gider */}
+                {isGider && (
+                  <>
+                    <StepRow num={2} label="Kategori" locked={step2Locked} lockedVal={step2LockedVal}
+                      disabled={!matForm.account_card && !drillCard}>
+                      <input className="input"
+                        placeholder="Örn: Lastik, Yağ & Filtre, Bakım..."
+                        value={matForm.category}
+                        disabled={!matForm.account_card && !drillCard}
+                        onChange={e => setMatForm({ ...matForm, category: e.target.value })} />
+                    </StepRow>
+                    <StepConnector active={!!matForm.category} />
+                  </>
                 )}
-              </Field>
-              <Field label="Birim">
-                <select className="input" value={matForm.unit} onChange={e => setMatForm({ ...matForm, unit: e.target.value })}>
-                  {UNITS.map(u => <option key={u}>{u}</option>)}
-                </select>
-              </Field>
+
+                {/* SON ADIM: İsim + Birim */}
+                <StepRow num={finalStepNum} label="Tanım Adı & Birim" disabled={!finalEnabled}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '0.75rem' }}>
+                    <input autoFocus className="input"
+                      placeholder="Örn: Motor Yağı 10W-40..."
+                      value={matForm.name}
+                      disabled={!finalEnabled}
+                      onChange={e => setMatForm({ ...matForm, name: e.target.value })}
+                      onKeyDown={e => e.key === 'Enter' && handleSaveMaterial()} />
+                    <select className="input" value={matForm.unit} disabled={!finalEnabled}
+                      onChange={e => setMatForm({ ...matForm, unit: e.target.value })}>
+                      {UNITS.map(u => <option key={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </StepRow>
+
+              </div>
+
+              <ModalFooter onCancel={() => setShowMatModal(false)} onSave={handleSaveMaterial} />
             </div>
-            <ModalFooter onCancel={() => setShowMatModal(false)} onSave={handleSaveMaterial} />
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Kasa Modal */}
       {showKasaModal && (
@@ -1080,6 +1154,40 @@ const RoleDropdown = ({ value, onChange, roles }) => (
       {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
     </select>
   </Field>
+);
+
+const StepRow = ({ num, label, locked, lockedVal, meta = {}, disabled, children }) => (
+  <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', padding: '1rem 0', opacity: disabled ? 0.4 : 1, transition: 'opacity 0.2s' }}>
+    {/* Numara balonu */}
+    <div style={{ width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0, marginTop: '7px',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: '800',
+      background: locked ? (meta.color || 'var(--primary)') : 'var(--primary)',
+      color: 'white' }}>{num}</div>
+
+    <div style={{ flex: 1 }}>
+      <p style={{ fontSize: '0.68rem', fontWeight: '800', color: 'var(--text-dim)', textTransform: 'uppercase',
+        letterSpacing: '0.07em', marginBottom: '0.4rem' }}>{label}</p>
+
+      {locked ? (
+        /* Kilitli durum — readonly chip */
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.9rem',
+          borderRadius: '10px', border: `1.5px solid ${meta.color || 'var(--primary)'}33`,
+          background: meta.bg || 'var(--primary-light)', userSelect: 'none' }}>
+          {meta.emoji && <span style={{ fontSize: '1.1rem' }}>{meta.emoji}</span>}
+          <span style={{ fontWeight: '700', fontSize: '0.88rem', color: meta.color || 'var(--primary)', flex: 1 }}>{lockedVal}</span>
+          <span style={{ fontSize: '0.68rem', background: meta.color || 'var(--primary)', color: 'white',
+            borderRadius: '4px', padding: '1px 5px', fontWeight: '700' }}>OTO</span>
+        </div>
+      ) : children}
+    </div>
+  </div>
+);
+
+const StepConnector = ({ active }) => (
+  <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '13px', gap: '4px' }}>
+    <div style={{ width: '2px', height: '20px', borderRadius: '2px',
+      background: active ? 'var(--primary)' : 'var(--border)', transition: 'background 0.2s' }} />
+  </div>
 );
 
 const overlay = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' };
