@@ -48,8 +48,7 @@ const Definitions = () => {
   const [search, setSearch]       = useState('');
 
   // Hiyerarşik navigasyon
-  const [drillCard, setDrillCard] = useState(null); // account_card (gider) veya category (malzeme)
-  const [drillCat,  setDrillCat]  = useState(null); // category (yalnızca gider 2. seviye)
+  const [drillCard, setDrillCard] = useState(null);
 
   const [materials, setMaterials]         = useState([]);
   const [showMatModal, setShowMatModal]   = useState(false);
@@ -137,7 +136,6 @@ const Definitions = () => {
 
   useEffect(() => {
     setDrillCard(null);
-    setDrillCat(null);
     setSearch('');
     if (activeTab === 'gider')         fetchMaterials('Gider');
     else if (activeTab === 'gelir')    fetchMaterials('Gelir');
@@ -159,23 +157,25 @@ const Definitions = () => {
   // ─── Material CRUD ───────────────────────────────────────────────────────────
   const handleSaveMaterial = async () => {
     if (!matForm.name.trim()) { alert('Tanım adı zorunludur.'); return; }
+    const { name, category, unit, item_type } = matForm;
+    const payload = { name, category, unit, item_type };
     let error;
     if (editMaterial) {
-      ({ error } = await supabase.from('materials').update({ ...matForm }).eq('id', editMaterial.id));
+      ({ error } = await supabase.from('materials').update(payload).eq('id', editMaterial.id));
     } else {
-      ({ error } = await supabase.from('materials').insert([{ ...matForm, company_id: cid }]));
+      ({ error } = await supabase.from('materials').insert([{ ...payload, company_id: cid }]));
     }
     if (error) { alert(error.message); return; }
     setShowMatModal(false);
     setEditMaterial(null);
     const itemType = activeTab === 'gider' ? 'Gider' : activeTab === 'gelir' ? 'Gelir' : 'Malzeme';
-    setMatForm({ name: '', account_card: '', category: 'Diğer', unit: 'Adet', item_type: itemType });
+    setMatForm({ name: '', category: '', unit: 'Adet', item_type: itemType });
     fetchMaterials(itemType);
   };
 
   const handleEditMaterial = (m) => {
     setEditMaterial(m);
-    setMatForm({ name: m.name, unit: m.unit, item_type: m.item_type, account_card: m.account_card || '', category: m.category || '' });
+    setMatForm({ name: m.name, unit: m.unit, item_type: m.item_type, category: m.category || '' });
     setShowMatModal(true);
   };
 
@@ -364,7 +364,7 @@ const Definitions = () => {
   const handleAddClick = () => {
     if (activeTab === 'gider' || activeTab === 'gelir' || activeTab === 'malzeme') {
       const itemType = activeTab === 'gider' ? 'Gider' : activeTab === 'gelir' ? 'Gelir' : 'Malzeme';
-      setMatForm({ name: '', unit: 'Adet', item_type: itemType, account_card: '', category: '' });
+      setMatForm({ name: '', unit: 'Adet', item_type: itemType, category: '' });
       setShowMatModal(true);
     } else if (activeTab === 'kasalar') {
       setKasaForm({ name: '', type: 'Kasa' });
@@ -385,13 +385,8 @@ const Definitions = () => {
 
   // ─── Grid/Contextual button (Klasör İçinden Hızlı Kayıt) ───
   const handleOpenAddModal = () => {
-    const isGiderOrGelir = activeTab === 'gider' || activeTab === 'gelir';
     const itemType = activeTab === 'gider' ? 'Gider' : activeTab === 'gelir' ? 'Gelir' : 'Malzeme';
-    setMatForm({
-      name: '', unit: 'Adet', item_type: itemType,
-      account_card: isGiderOrGelir ? (drillCard || '') : '',
-      category:     isGiderOrGelir ? (drillCat  || '') : (drillCard || ''),
-    });
+    setMatForm({ name: '', unit: 'Adet', item_type: itemType, category: drillCard || '' });
     setShowMatModal(true);
   };
 
@@ -445,34 +440,23 @@ const Definitions = () => {
 
             {/* ── GİDER & MALZEME — Hiyerarşik Drill-down ── */}
             {(activeTab === 'gider' || activeTab === 'gelir' || activeTab === 'malzeme') && (() => {
-              const isGider      = activeTab === 'gider';
-              const isGelir      = activeTab === 'gelir';
-              const isGiderLevel = isGider || isGelir; // 2-seviyeli drill-down
-              const topCards     = isGider ? GIDER_CARDS : isGelir ? GELIR_CARDS : MALZEME_CATS;
-              const digerLabel   = isGider ? 'Diğer Giderler' : isGelir ? 'Diğer Gelirler' : 'Diğer';
-              const getCardMeta  = (name) => CARD_META[name] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
+              const isGider    = activeTab === 'gider';
+              const isGelir    = activeTab === 'gelir';
+              const topCards   = isGider ? GIDER_CARDS : isGelir ? GELIR_CARDS : MALZEME_CATS;
+              const digerLabel = isGider ? 'Diğer Giderler' : isGelir ? 'Diğer Gelirler' : 'Diğer';
+              const getCardMeta = (name) => CARD_META[name] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
+
+              const validTopCards = topCards.filter(c => c !== digerLabel);
 
               const level2List = materials.filter(m => {
                 if (!drillCard) return false;
-                if (isGiderLevel) {
-                  const matchCard = m.account_card === drillCard || (!m.account_card && drillCard === digerLabel);
-                  if (!matchCard) return false;
-                  if (drillCat) return m.category === drillCat;
-                  return true;
-                } else {
-                  if (drillCard === 'Diğer') {
-                    return !m.category || !MALZEME_CATS.includes(m.category) || m.category === 'Diğer';
-                  }
-                  return m.category === drillCard;
+                if (drillCard === digerLabel) {
+                  return !m.category || !validTopCards.includes(m.category) || m.category === digerLabel;
                 }
+                return m.category === drillCard;
               });
 
-              const uniqueCatsUnderCard = drillCard && isGiderLevel
-                ? [...new Set(materials.filter(m => (m.account_card === drillCard || (!m.account_card && drillCard === digerLabel)) && m.category).map(m => m.category))]
-                : [];
-
-              const showCategoryGrid  = isGiderLevel && drillCard && !drillCat;
-              const showMaterialTable = isGiderLevel ? (drillCard && drillCat) : !!drillCard;
+              const showMaterialTable = !!drillCard;
               const showCardGrid      = !drillCard;
 
               const filtered = level2List.filter(m =>
@@ -484,7 +468,7 @@ const Definitions = () => {
                   {/* Breadcrumb + Add Button */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem', gap: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button onClick={() => { setDrillCard(null); setDrillCat(null); setSearch(''); }}
+                    <button onClick={() => { setDrillCard(null); setSearch(''); }}
                       style={{ background: 'none', border: 'none', cursor: drillCard ? 'pointer' : 'default',
                         fontWeight: '700', fontSize: '0.92rem',
                         color: drillCard ? 'var(--primary)' : 'var(--text)',
@@ -494,19 +478,7 @@ const Definitions = () => {
                     {drillCard && (
                       <>
                         <ChevronRight size={14} style={{ color: 'var(--text-dim)' }} />
-                        <button onClick={() => { setDrillCat(null); setSearch(''); }}
-                          style={{ background: 'none', border: 'none', cursor: (isGider && drillCat) ? 'pointer' : 'default',
-                            fontWeight: '700', fontSize: '0.92rem',
-                            color: (isGider && drillCat) ? 'var(--primary)' : 'var(--text)',
-                            textDecoration: (isGider && drillCat) ? 'underline' : 'none', padding: 0 }}>
-                          {drillCard}
-                        </button>
-                      </>
-                    )}
-                    {drillCat && (
-                      <>
-                        <ChevronRight size={14} style={{ color: 'var(--text-dim)' }} />
-                        <span style={{ fontWeight: '700', fontSize: '0.92rem' }}>{drillCat}</span>
+                        <span style={{ fontWeight: '700', fontSize: '0.92rem' }}>{drillCard}</span>
                       </>
                     )}
                   </div>
@@ -524,14 +496,13 @@ const Definitions = () => {
 
                         const meta  = getCardMeta(card);
                         const count = materials.filter(m => {
-                          if (isGiderLevel) return m.account_card === card || (!m.account_card && card === 'Diğer Giderler');
-                          if (card === 'Diğer') {
-                            return !m.category || !MALZEME_CATS.includes(m.category) || m.category === 'Diğer';
+                          if (card === digerLabel) {
+                            return !m.category || !validTopCards.includes(m.category) || m.category === digerLabel;
                           }
                           return m.category === card;
                         }).length;
                         return (
-                          <div key={card} onClick={() => { setDrillCard(card); setDrillCat(null); }}
+                          <div key={card} onClick={() => { setDrillCard(card); }}
                             style={{ padding: '1.25rem', borderRadius: '14px', border: '1.5px solid', borderColor: meta.color + '33',
                               background: meta.bg, cursor: 'pointer', transition: 'box-shadow 0.18s',
                               display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
@@ -556,46 +527,7 @@ const Definitions = () => {
                     </div>
                   )}
 
-                  {/* Level 1 — Kategori grid (yalnızca Gider) */}
-                  {!loading && showCategoryGrid && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
-                      {uniqueCatsUnderCard.map(cat => {
-                        const meta  = CARD_META[cat] || { color: '#64748b', bg: '#f8fafc', emoji: '📂' };
-                        const count = materials.filter(m => m.account_card === drillCard && m.category === cat).length;
-                        return (
-                          <div key={cat} onClick={() => setDrillCat(cat)}
-                            style={{ padding: '1.1rem', borderRadius: '12px', border: '1.5px solid', borderColor: meta.color + '33',
-                              background: meta.bg, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', transition: 'box-shadow 0.18s' }}
-                            onMouseEnter={e => e.currentTarget.style.boxShadow = `0 4px 14px ${meta.color}22`}
-                            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
-                            <span style={{ fontSize: '1.4rem' }}>{meta.emoji}</span>
-                            <div style={{ flex: 1 }}>
-                              <p style={{ fontWeight: '700', fontSize: '0.82rem', color: meta.color }}>{cat}</p>
-                              <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>{count} kalem</p>
-                            </div>
-                            <ChevronRight size={13} style={{ color: meta.color, flexShrink: 0 }} />
-                          </div>
-                        );
-                      })}
-                      {/* + Yeni Kalem Ekle tile */}
-                      <div onClick={handleOpenAddModal}
-                        style={{ padding: '1.1rem', borderRadius: '12px', border: '2px dashed var(--border)',
-                          background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                          gap: '0.75rem', transition: 'all 0.18s', color: 'var(--primary)' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary-light)'; e.currentTarget.style.borderColor = 'var(--primary)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Plus size={18} style={{ color: 'var(--primary)' }} />
-                        </div>
-                        <div>
-                          <p style={{ fontWeight: '700', fontSize: '0.82rem' }}>Yeni Kalem Ekle</p>
-                          <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '2px' }}>Bu karta kalem ekle</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Level 2 — Malzeme listesi */}
+                  {/* Level 1 — Malzeme listesi */}
                   {!loading && showMaterialTable && (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '0.75rem' }}>
@@ -817,30 +749,12 @@ const Definitions = () => {
 
       {/* Malzeme/Gider Modal — Stepped */}
       {showMatModal && (() => {
-        const isGider    = activeTab === 'gider';
-        const isGelir    = activeTab === 'gelir';
-        const isGiderOrGelir = isGider || isGelir;
-        // Düzenleme modunda adımlar kilitli değil; yeni eklemede context varsa kilitli
-        const cardLocked = !editMaterial && (isGiderOrGelir ? !!matForm.account_card : !!matForm.category);
-        const catLocked  = !editMaterial && isGiderOrGelir && !!matForm.category;
-        const currentContext = isGiderOrGelir ? matForm.account_card : matForm.category;
-        const cardMeta   = CARD_META[currentContext] || {};
-
+        const isGider = activeTab === 'gider';
+        const isGelir = activeTab === 'gelir';
         const step1Label    = isGider ? 'Gider Kartı' : isGelir ? 'Gelir Kartı' : 'Kategori';
-        const step1LockedVal = isGiderOrGelir ? matForm.account_card : matForm.category;
-        const step1Locked   = cardLocked;
-
-        // Step 2 visible only for gider/gelir (category)
-        const step2Locked    = catLocked;
-        const step2LockedVal = matForm.category;
-
-        // Final step number
-        const finalStepNum = isGiderOrGelir ? 3 : 2;
-
-        // Is final step enabled?
-        const step1Done    = isGiderOrGelir ? !!matForm.account_card : !!matForm.category;
-        const step2Done    = !isGiderOrGelir || !!matForm.category;
-        const finalEnabled = step1Done && step2Done;
+        const step1Locked   = !editMaterial && !!matForm.category;
+        const step1Options  = isGider ? GIDER_CARDS : isGelir ? GELIR_CARDS : MALZEME_CATS;
+        const cardMeta      = CARD_META[matForm.category] || {};
 
         return (
           <div style={overlay}>
@@ -855,55 +769,26 @@ const Definitions = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
 
                 {/* ADIM 1 */}
-                <StepRow num={1} label={step1Label} locked={step1Locked} lockedVal={step1LockedVal} meta={cardMeta}>
-                  {isGider ? (
-                    <select className="input" value={matForm.account_card}
-                      onChange={e => setMatForm({ ...matForm, account_card: e.target.value, category: '' })}>
-                      <option value="">Seçiniz...</option>
-                      {GIDER_CARDS.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  ) : isGelir ? (
-                    <select className="input" value={matForm.account_card}
-                      onChange={e => setMatForm({ ...matForm, account_card: e.target.value, category: '' })}>
-                      <option value="">Seçiniz...</option>
-                      {GELIR_CARDS.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  ) : (
-                    <select className="input" value={matForm.category}
-                      onChange={e => setMatForm({ ...matForm, category: e.target.value })}>
-                      <option value="">Seçiniz...</option>
-                      {MALZEME_CATS.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  )}
+                <StepRow num={1} label={step1Label} locked={step1Locked} lockedVal={matForm.category} meta={cardMeta}>
+                  <select className="input" value={matForm.category}
+                    onChange={e => setMatForm({ ...matForm, category: e.target.value })}>
+                    <option value="">Seçiniz...</option>
+                    {step1Options.map(c => <option key={c}>{c}</option>)}
+                  </select>
                 </StepRow>
 
-                <StepConnector active={step1Done} />
-
-                {/* ADIM 2 — Gider veya Gelir */}
-                {isGiderOrGelir && (
-                  <>
-                    <StepRow num={2} label="Kategori" locked={step2Locked} lockedVal={step2LockedVal}
-                      disabled={!matForm.account_card && !drillCard}>
-                      <input className="input"
-                        placeholder="Örn: Lastik, Yağ & Filtre, Bakım..."
-                        value={matForm.category}
-                        disabled={!matForm.account_card && !drillCard}
-                        onChange={e => setMatForm({ ...matForm, category: e.target.value })} />
-                    </StepRow>
-                    <StepConnector active={!!matForm.category} />
-                  </>
-                )}
+                <StepConnector active={!!matForm.category} />
 
                 {/* SON ADIM: İsim + Birim */}
-                <StepRow num={finalStepNum} label="Tanım Adı & Birim" disabled={!finalEnabled}>
+                <StepRow num={2} label="Tanım Adı & Birim" disabled={!matForm.category}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '0.75rem' }}>
                     <input autoFocus className="input"
                       placeholder="Örn: Motor Yağı 10W-40..."
                       value={matForm.name}
-                      disabled={!finalEnabled}
+                      disabled={!matForm.category}
                       onChange={e => setMatForm({ ...matForm, name: e.target.value })}
                       onKeyDown={e => e.key === 'Enter' && handleSaveMaterial()} />
-                    <select className="input" value={matForm.unit} disabled={!finalEnabled}
+                    <select className="input" value={matForm.unit} disabled={!matForm.category}
                       onChange={e => setMatForm({ ...matForm, unit: e.target.value })}>
                       {UNITS.map(u => <option key={u}>{u}</option>)}
                     </select>
