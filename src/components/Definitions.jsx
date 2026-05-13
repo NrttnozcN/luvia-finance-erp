@@ -21,9 +21,10 @@ const Definitions = () => {
   const [loading, setLoading]     = useState(false);
   const [search, setSearch]       = useState('');
 
-  // ── Materials ──
   const [materials, setMaterials]         = useState([]);
   const [showMatModal, setShowMatModal]   = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkText, setBulkText]           = useState('');
   const [matForm, setMatForm]             = useState({ name: '', category: 'Gider', unit: 'Adet', item_type: 'Gider' });
 
   // ── Kasalar ──
@@ -117,6 +118,53 @@ const Definitions = () => {
     setShowMatModal(false);
     setMatForm({ name: '', category: 'Gider', unit: 'Adet', item_type: 'Gider' });
     fetchMaterials(activeTab === 'gider' ? 'Gider' : 'Malzeme');
+  };
+
+  const handleBulkMaterialUpload = async () => {
+    if (!bulkText.trim()) { alert('Lütfen Excel verilerini yapıştırın.'); return; }
+    
+    setLoading(true);
+    const rows = bulkText.split('\n').filter(line => line.trim());
+    const newItems = rows.map(row => {
+      const cols = row.split('\t');
+      return {
+        name: cols[0]?.trim(),
+        category: cols[1]?.trim() || (activeTab === 'gider' ? 'Gider' : 'Yedek Parça'),
+        unit: cols[2]?.trim() || 'Adet',
+        item_type: activeTab === 'gider' ? 'Gider' : 'Malzeme',
+        company_id: cid
+      };
+    }).filter(item => item.name);
+
+    if (newItems.length === 0) {
+      alert('Geçerli veri bulunamadı.');
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.from('materials').insert(newItems);
+    if (error) {
+      alert('Toplu yükleme hatası: ' + error.message);
+    } else {
+      alert(`${newItems.length} adet malzeme başarıyla eklendi.`);
+      setShowBulkModal(false);
+      setBulkText('');
+      fetchMaterials(activeTab === 'gider' ? 'Gider' : 'Malzeme');
+    }
+    setLoading(false);
+  };
+
+  const downloadSampleExcel = () => {
+    const headers = 'Malzeme Adı\tKategori\tBirim';
+    const sample = 'Örnek Parça\tYedek Parça\tAdet\nÖrnek Yağ\tYağ & Filtre\tLitre';
+    const content = headers + '\n' + sample;
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ornek_malzeme_listesi.txt';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleDeleteMaterial = async (id) => {
@@ -276,11 +324,18 @@ const Definitions = () => {
           <h1 style={{ fontSize: '2rem' }}>Sistem Tanımlamaları</h1>
           <p className="text-muted">Kartlar, kasalar, kullanıcılar, roller ve doküman kategorilerini yönetin.</p>
         </div>
-        {ADD_LABELS[activeTab] && (
-          <button className="btn btn-primary" onClick={handleAddClick}>
-            <Plus size={20} /> {ADD_LABELS[activeTab]}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          {(activeTab === 'malzeme' || activeTab === 'gider') && (
+            <button className="btn btn-ghost" onClick={() => setShowBulkModal(true)} style={{ color: 'var(--primary)', fontWeight: '700' }}>
+              📥 Toplu Yükle
+            </button>
+          )}
+          {ADD_LABELS[activeTab] && (
+            <button className="btn btn-primary" onClick={handleAddClick}>
+              <Plus size={20} /> {ADD_LABELS[activeTab]}
+            </button>
+          )}
+        </div>
       </header>
 
       <div style={{ display: 'flex', gap: '2rem' }}>
@@ -695,6 +750,46 @@ const Definitions = () => {
               <input className="input" placeholder="Örn: Fatura, Sözleşme, Dekont" value={docCatForm.name} onChange={e => setDocCatForm({ name: e.target.value })} />
             </Field>
             <ModalFooter onCancel={() => setShowDocCatModal(false)} onSave={handleSaveDocCat} />
+          </div>
+        </div>
+      )}
+      {/* TOPLU YÜKLEME MODALI */}
+      {showBulkModal && (
+        <div style={modalOverlayStyle}>
+          <div className="card" style={{ ...modalContentStyle, maxWidth: '600px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem' }}>Toplu Malzeme Yükle (Excel'den)</h2>
+                <p className="text-muted" style={{ fontSize: '0.8rem' }}>Excel'deki sütunları seçip buraya yapıştırın.</p>
+              </div>
+              <button onClick={() => setShowBulkModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+            </div>
+            
+            <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
+              <p style={{ fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem' }}>Format Nasıl Olmalı?</p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: '1.5' }}>
+                Excel'de sırasıyla <strong>Ad | Kategori | Birim</strong> sütunlarını kopyalayıp aşağıdaki kutuya yapıştırın. <br/>
+                Örn: <code style={{ color: 'var(--primary)' }}>Fren Balatası [TAB] Yedek Parça [TAB] Adet</code>
+              </p>
+              <button className="btn btn-ghost" onClick={downloadSampleExcel} style={{ fontSize: '0.75rem', marginTop: '0.5rem', padding: '0.4rem 0.75rem' }}>
+                📄 Örnek Dosyayı İndir
+              </button>
+            </div>
+
+            <textarea
+              className="input"
+              style={{ minHeight: '200px', fontFamily: 'monospace', fontSize: '0.85rem', marginBottom: '1.5rem', resize: 'vertical' }}
+              placeholder="Excel'den kopyaladığınız satırları buraya yapıştırın..."
+              value={bulkText}
+              onChange={e => setBulkText(e.target.value)}
+            />
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setShowBulkModal(false)}>İptal</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleBulkMaterialUpload} disabled={loading}>
+                {loading ? 'Yükleniyor...' : `🚀 ${bulkText.split('\n').filter(l => l.trim()).length} Satırı Yükle`}
+              </button>
+            </div>
           </div>
         </div>
       )}
