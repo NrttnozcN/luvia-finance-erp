@@ -3,7 +3,7 @@ import {
   Plus, Search, Trash2, Edit2, ChevronRight,
   Package, Wallet, X, Shield, Users, FolderOpen,
   Eye, EyeOff, Pencil, CheckSquare, Square,
-  DollarSign, Upload, FileSpreadsheet,
+  DollarSign, Upload, FileSpreadsheet, Tag,
 } from 'lucide-react';
 // xlsx dinamik import — yalnızca kullanıldığında yüklenir
 const getXLSX = () => import('xlsx');
@@ -15,6 +15,20 @@ const GIDER_CARDS   = ['Araç ve İş Makinesi Giderleri', 'Akaryakıt Giderleri
 const GELIR_CARDS   = ['Hakediş Geliri', 'Ürün Satış Geliri', 'Hizmet Satış Geliri', 'Diğer Gelirler'];
 const MALZEME_CATS  = ['Yedek Parça', 'Akaryakıt', 'Yağ & Filtre', 'Lastik', 'Büro Malzemesi', 'Gıda', 'Hizmet', 'Diğer'];
 const UNITS         = ['Adet', 'Litre', 'Kg', 'Saat', 'Metre', 'Kutu', 'Gün'];
+
+const EMOJI_LIST = [
+  '📁','🚗','🚛','🏗️','⛽','📎','🍽️','🏢','👥','📦',
+  '💰','🛒','⚙️','📊','🔧','🛢️','💊','🎓','✈️','🚢',
+  '🔑','🎯','💼','📋','🖥️','📱','🏠','🏭','💡','🔨',
+  '⚡','⭕','🥤','🌿','💎','🎁','🔩','📐','🧰','🏆',
+  '🚜','🏪','📫','🧾','💳','🏦','📈','📉','🗂️','🧲',
+];
+const COLOR_OPTIONS = [
+  '#3b82f6','#f97316','#8b5cf6','#ec4899','#06b6d4',
+  '#16a34a','#64748b','#ef4444','#eab308','#14b8a6',
+  '#f59e0b','#6366f1','#10b981','#84cc16','#a855f7',
+  '#0ea5e9','#d97706','#dc2626','#7c3aed','#059669',
+];
 
 const CARD_META = {
   'Araç ve İş Makinesi Giderleri': { color: '#3b82f6', bg: '#eff6ff',  emoji: '🚗' },
@@ -58,6 +72,12 @@ const Definitions = () => {
   const fileInputRef                      = useRef(null);
   const [matForm, setMatForm]             = useState({ name: '', category: 'Gider', unit: 'Adet', item_type: 'Gider' });
   const [editMaterial, setEditMaterial]   = useState(null);
+
+  // ── Hesap Kartları ──
+  const [accountCards, setAccountCards]     = useState([]);
+  const [showCardDefModal, setShowCardDefModal] = useState(false);
+  const [editCardDef, setEditCardDef]       = useState(null);
+  const [cardDefForm, setCardDefForm]       = useState({ name: '', emoji: '📁', color: '#3b82f6', card_type: 'Gider' });
 
   // ── Kasalar ──
   const [kasalar, setKasalar]           = useState([]);
@@ -134,16 +154,27 @@ const Definitions = () => {
     setDocCats(data || []);
   };
 
+  const fetchAccountCards = async () => {
+    if (!cid) return;
+    const { data } = await supabase
+      .from('account_cards')
+      .select('*')
+      .eq('company_id', cid)
+      .order('name');
+    setAccountCards(data || []);
+  };
+
   useEffect(() => {
     setDrillCard(null);
     setDrillCat(null);
     setSearch('');
-    if (activeTab === 'gider')         fetchMaterials('Gider');
-    else if (activeTab === 'malzeme')  fetchMaterials('Malzeme');
-    else if (activeTab === 'kasalar')  fetchKasalar();
-    else if (activeTab === 'users')    { fetchUsers(); fetchRoles(); }
-    else if (activeTab === 'roles')    { fetchRoles(); }
-    else if (activeTab === 'doc_cats') fetchDocCats();
+    if (activeTab === 'gider')              { fetchMaterials('Gider'); fetchAccountCards(); }
+    else if (activeTab === 'malzeme')       fetchMaterials('Malzeme');
+    else if (activeTab === 'kasalar')       fetchKasalar();
+    else if (activeTab === 'users')         { fetchUsers(); fetchRoles(); }
+    else if (activeTab === 'roles')         fetchRoles();
+    else if (activeTab === 'doc_cats')      fetchDocCats();
+    else if (activeTab === 'hesap_kartlari') fetchAccountCards();
     
     console.log('Definitions - Active Tab:', activeTab, 'Company ID:', cid);
   }, [activeTab, cid]);
@@ -356,6 +387,34 @@ const Definitions = () => {
     fetchDocCats();
   };
 
+  // ─── Account Card CRUD ──────────────────────────────────────────────────────
+  const handleSaveCardDef = async () => {
+    if (!cardDefForm.name.trim()) { alert('Kart adı zorunludur.'); return; }
+    let error;
+    if (editCardDef) {
+      ({ error } = await supabase.from('account_cards').update({ name: cardDefForm.name, emoji: cardDefForm.emoji, color: cardDefForm.color, card_type: cardDefForm.card_type }).eq('id', editCardDef.id));
+    } else {
+      ({ error } = await supabase.from('account_cards').insert([{ ...cardDefForm, company_id: cid }]));
+    }
+    if (error) { alert(error.message); return; }
+    setShowCardDefModal(false);
+    setEditCardDef(null);
+    setCardDefForm({ name: '', emoji: '📁', color: '#3b82f6', card_type: 'Gider' });
+    fetchAccountCards();
+  };
+
+  const handleDeleteCardDef = async (id) => {
+    if (!window.confirm('Bu hesap kartını silmek istediğinizden emin misiniz?')) return;
+    await supabase.from('account_cards').delete().eq('id', id);
+    fetchAccountCards();
+  };
+
+  const handleEditCardDef = (card) => {
+    setEditCardDef(card);
+    setCardDefForm({ name: card.name, emoji: card.emoji, color: card.color, card_type: card.card_type });
+    setShowCardDefModal(true);
+  };
+
   // ─── Header button ───────────────────────────────────────────────────────────
   // ─── Header button (Global & Serbest Kayıt) ───
   const handleAddClick = () => {
@@ -381,6 +440,10 @@ const Definitions = () => {
     } else if (activeTab === 'doc_cats') {
       setDocCatForm({ name: '' });
       setShowDocCatModal(true);
+    } else if (activeTab === 'hesap_kartlari') {
+      setCardDefForm({ name: '', emoji: '📁', color: '#3b82f6', card_type: 'Gider' });
+      setEditCardDef(null);
+      setShowCardDefModal(true);
     }
   };
 
@@ -400,6 +463,7 @@ const Definitions = () => {
     gider: 'Yeni Gider Kartı', malzeme: 'Yeni Malzeme',
     kasalar: 'Yeni Kasa Ekle', users: 'Yeni Kullanıcı',
     roles: 'Yeni Rol', doc_cats: 'Yeni Kategori',
+    hesap_kartlari: 'Yeni Hesap Kartı',
   };
 
   // ─── Search filter ───────────────────────────────────────────────────────────
@@ -429,9 +493,10 @@ const Definitions = () => {
         {/* Sidebar */}
         <div style={{ width: '260px', flexShrink: 0 }}>
           <div className="card" style={{ padding: '0.75rem' }}>
-            <TabBtn active={activeTab==='gider'}    onClick={()=>setActiveTab('gider')}    icon={<DollarSign size={18}/>} label="Gider Kartları" />
-            <TabBtn active={activeTab==='malzeme'}  onClick={()=>setActiveTab('malzeme')}  icon={<Package size={18}/>}    label="Malzeme Kartları" />
-            <TabBtn active={activeTab==='kasalar'}  onClick={()=>setActiveTab('kasalar')}  icon={<Wallet size={18}/>}     label="Kasalar & Hesaplar" />
+            <TabBtn active={activeTab==='gider'}          onClick={()=>setActiveTab('gider')}          icon={<DollarSign size={18}/>} label="Gider Kartları" />
+            <TabBtn active={activeTab==='malzeme'}        onClick={()=>setActiveTab('malzeme')}        icon={<Package size={18}/>}    label="Malzeme Kartları" />
+            <TabBtn active={activeTab==='hesap_kartlari'} onClick={()=>setActiveTab('hesap_kartlari')} icon={<Tag size={18}/>}        label="Hesap Kartları" />
+            <TabBtn active={activeTab==='kasalar'}        onClick={()=>setActiveTab('kasalar')}        icon={<Wallet size={18}/>}     label="Kasalar & Hesaplar" />
             <TabBtn active={activeTab==='doc_cats'} onClick={()=>setActiveTab('doc_cats')} icon={<FolderOpen size={18}/>} label="Doküman Kategorileri" />
             <div style={{ height: '1px', background: 'var(--border)', margin: '0.5rem 0' }} />
             <TabBtn active={activeTab==='users'}    onClick={()=>setActiveTab('users')}    icon={<Users size={18}/>}      label="Kullanıcı Yönetimi" />
@@ -447,7 +512,15 @@ const Definitions = () => {
             {(activeTab === 'gider' || activeTab === 'malzeme') && (() => {
               const isGiderLevel = activeTab === 'gider';
               const isGider      = isGiderLevel;
-              const topCards = isGiderLevel ? GIDER_CARDS : MALZEME_CATS;
+              const dbGiderCards = accountCards.filter(c => c.card_type === 'Gider');
+              const topCards = isGiderLevel
+                ? (dbGiderCards.length > 0 ? dbGiderCards.map(c => c.name) : GIDER_CARDS)
+                : MALZEME_CATS;
+              const getCardMeta = (name) => {
+                const db = accountCards.find(c => c.name === name);
+                if (db) return { color: db.color, bg: db.color + '18', emoji: db.emoji };
+                return CARD_META[name] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
+              };
 
               const level2List = materials.filter(m => {
                 if (!drillCard) return false;
@@ -519,7 +592,7 @@ const Definitions = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
                       {topCards.map(card => {
 
-                        const meta  = CARD_META[card] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
+                        const meta  = getCardMeta(card);
                         const count = materials.filter(m => {
                           if (isGiderLevel) return m.account_card === card || (!m.account_card && card === 'Diğer Giderler');
                           if (card === 'Diğer') {
@@ -642,6 +715,42 @@ const Definitions = () => {
                 </>
               );
             })()}
+
+            {/* ── HESAP KARTLARI ── */}
+            {activeTab === 'hesap_kartlari' && (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  {['Gider', 'Gelir'].map(type => {
+                    const cards = accountCards.filter(c => c.card_type === type);
+                    return (
+                      <div key={type}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-dim)' }}>
+                          {type === 'Gider' ? '📤 Gider Hesap Kartları' : '📥 Gelir Hesap Kartları'}
+                        </h3>
+                        {cards.length === 0 ? (
+                          <p className="text-dim" style={{ fontSize: '0.85rem' }}>Henüz {type.toLowerCase()} hesap kartı tanımlanmadı.</p>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                            {cards.map(card => (
+                              <div key={card.id} style={{ padding: '1rem 1.1rem', borderRadius: '12px', border: '1.5px solid', borderColor: card.color + '33', background: card.color + '0f', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <span style={{ fontSize: '1.6rem', lineHeight: 1, flexShrink: 0 }}>{card.emoji}</span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{ fontWeight: '700', fontSize: '0.82rem', color: card.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.name}</p>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.1rem', flexShrink: 0 }}>
+                                  <button className="btn btn-ghost" style={{ padding: '0.3rem', color: 'var(--primary)' }} onClick={() => handleEditCardDef(card)}><Edit2 size={14} /></button>
+                                  <button className="btn btn-ghost" style={{ padding: '0.3rem', color: 'var(--danger)' }} onClick={() => handleDeleteCardDef(card.id)}><Trash2 size={14} /></button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             {/* ── KASALAR ── */}
             {activeTab === 'kasalar' && (
@@ -907,6 +1016,89 @@ const Definitions = () => {
           </div>
         );
       })()}
+
+      {/* Hesap Kartı Modal */}
+      {showCardDefModal && (
+        <div style={overlay}>
+          <div className="card" style={{ ...modal, maxWidth: '520px' }}>
+            <ModalHeader
+              title={editCardDef ? 'Hesap Kartı Düzenle' : 'Yeni Hesap Kartı'}
+              onClose={() => { setShowCardDefModal(false); setEditCardDef(null); }}
+            />
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {/* Kart Adı */}
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-dim)', display: 'block', marginBottom: '0.4rem' }}>KART ADI</label>
+                <input className="input" placeholder="Örn: Araç ve İş Makinesi Giderleri"
+                  value={cardDefForm.name}
+                  onChange={e => setCardDefForm({ ...cardDefForm, name: e.target.value })} />
+              </div>
+
+              {/* Kart Türü */}
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-dim)', display: 'block', marginBottom: '0.4rem' }}>KART TÜRÜ</label>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  {['Gider', 'Gelir'].map(t => (
+                    <button key={t} type="button"
+                      onClick={() => setCardDefForm({ ...cardDefForm, card_type: t })}
+                      style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer', border: '2px solid', transition: 'all 0.15s',
+                        borderColor: cardDefForm.card_type === t ? 'var(--primary)' : 'var(--border)',
+                        background: cardDefForm.card_type === t ? 'var(--primary-light)' : 'transparent',
+                        color: cardDefForm.card_type === t ? 'var(--primary)' : 'var(--text-dim)' }}>
+                      {t === 'Gider' ? '📤 Gider' : '📥 Gelir'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Emoji Seçimi */}
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-dim)', display: 'block', marginBottom: '0.4rem' }}>
+                  EMOJİ &nbsp;<span style={{ fontWeight: '400' }}>Seçili: {cardDefForm.emoji}</span>
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', maxHeight: '130px', overflowY: 'auto', padding: '0.25rem' }}>
+                  {EMOJI_LIST.map(e => (
+                    <button key={e} type="button"
+                      onClick={() => setCardDefForm({ ...cardDefForm, emoji: e })}
+                      style={{ fontSize: '1.3rem', padding: '0.25rem 0.35rem', borderRadius: '6px', border: '2px solid', cursor: 'pointer', lineHeight: 1,
+                        borderColor: cardDefForm.emoji === e ? 'var(--primary)' : 'transparent',
+                        background: cardDefForm.emoji === e ? 'var(--primary-light)' : 'transparent' }}>
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Renk Seçimi */}
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-dim)', display: 'block', marginBottom: '0.4rem' }}>RENK</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {COLOR_OPTIONS.map(c => (
+                    <button key={c} type="button"
+                      onClick={() => setCardDefForm({ ...cardDefForm, color: c })}
+                      style={{ width: '28px', height: '28px', borderRadius: '50%', border: '3px solid', cursor: 'pointer',
+                        background: c,
+                        borderColor: cardDefForm.color === c ? '#111' : 'transparent',
+                        boxShadow: cardDefForm.color === c ? `0 0 0 2px ${c}` : 'none' }} />
+                  ))}
+                </div>
+                {/* Önizleme */}
+                <div style={{ marginTop: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 1rem', borderRadius: '10px', border: '1.5px solid', borderColor: cardDefForm.color + '44', background: cardDefForm.color + '12' }}>
+                  <span style={{ fontSize: '1.3rem' }}>{cardDefForm.emoji}</span>
+                  <span style={{ fontWeight: '700', fontSize: '0.85rem', color: cardDefForm.color }}>{cardDefForm.name || 'Kart Adı'}</span>
+                </div>
+              </div>
+            </div>
+
+            <ModalFooter
+              onCancel={() => { setShowCardDefModal(false); setEditCardDef(null); }}
+              onSave={handleSaveCardDef}
+              saveLabel={editCardDef ? 'Güncelle' : 'Kaydet'}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Kasa Modal */}
       {showKasaModal && (
