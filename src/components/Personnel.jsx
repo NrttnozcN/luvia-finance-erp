@@ -150,7 +150,7 @@ const DefinitionTab = ({ cid }) => {
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase.from('employees').select('*, facilities(name)').eq('company_id', cid).order('full_name');
-    setEmployees(data || []);
+    setEmployees((data || []).map(e => ({ ...e, status: e.status || 'Aktif' })));
     setLoading(false);
   }, [cid]);
 
