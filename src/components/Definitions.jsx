@@ -434,8 +434,13 @@ const Definitions = () => {
             {(activeTab === 'gider' || activeTab === 'gelir' || activeTab === 'malzeme') && (() => {
               const isGider    = activeTab === 'gider';
               const isGelir    = activeTab === 'gelir';
-              const topCards   = isGider ? GIDER_CARDS : isGelir ? GELIR_CARDS : MALZEME_CATS;
               const digerLabel = isGider ? 'Diğer Giderler' : isGelir ? 'Diğer Gelirler' : 'Diğer';
+              
+              // Veritabanından gelen tüm kategorileri dinamik olarak al ve sabitlerle birleştir
+              const defaultCards = isGider ? GIDER_CARDS : isGelir ? GELIR_CARDS : MALZEME_CATS;
+              const dynamicCards = [...new Set(materials.map(m => m.category).filter(Boolean))];
+              const topCards = [...new Set([...defaultCards, ...dynamicCards])];
+
               const getCardMeta = (name) => CARD_META[name] || { color: '#64748b', bg: '#f8fafc', emoji: '📁' };
 
               const validTopCards = topCards.filter(c => c !== digerLabel);
