@@ -82,8 +82,7 @@ const Companies = () => {
       email: newAdmin.email.trim().toLowerCase() || null,
       password: newAdmin.password,
       role: 'Admin',
-      company_id: company.id,
-      status: 'Aktif',
+      company_id: company.id
     }]);
 
     if (profError) {
