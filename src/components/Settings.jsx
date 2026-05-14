@@ -5,10 +5,31 @@ import {
   Clock, Server, Table2, Activity,
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
+import { supabase } from '../lib/supabase';
 
 const Settings = () => {
   const currentUser = useAuthStore(s => s.currentUser);
+  const updateUser = useAuthStore(s => s.updateUser);
   const [activeTab, setActiveTab] = useState('profile');
+  const [profileForm, setProfileForm] = useState({
+    full_name: currentUser?.name || '',
+    email: currentUser?.email || '',
+    username: currentUser?.username || '',
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  const handleSaveProfile = async () => {
+    if (!profileForm.full_name.trim()) { alert('Ad Soyad zorunludur.'); return; }
+    setProfileSaving(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ full_name: profileForm.full_name, email: profileForm.email, username: profileForm.username })
+      .eq('id', currentUser.id);
+    setProfileSaving(false);
+    if (error) { alert('Güncelleme hatası: ' + error.message); return; }
+    updateUser({ name: profileForm.full_name, email: profileForm.email, username: profileForm.username });
+    alert('Profil güncellendi.');
+  };
 
   // ── Bildirim ayarları (localStorage'da tutulur) ──
   const [notifSettings, setNotifSettings] = useState(() => {
@@ -60,13 +81,13 @@ const Settings = () => {
                   </div>
                 </div>
                 <div className="grid grid-cols-2" style={{ gap: '1.5rem' }}>
-                  <InputGroup label="Ad Soyad" defaultValue={currentUser?.name || ''} />
-                  <InputGroup label="E-Posta"   defaultValue={currentUser?.email || ''} />
-                  <InputGroup label="Kullanıcı Adı" defaultValue={currentUser?.username || ''} />
-                  <InputGroup label="Firma" defaultValue={currentUser?.companyName || '—'} readOnly />
+                  <InputGroup label="Ad Soyad" value={profileForm.full_name} onChange={e => setProfileForm(f => ({ ...f, full_name: e.target.value }))} />
+                  <InputGroup label="E-Posta"   value={profileForm.email}    onChange={e => setProfileForm(f => ({ ...f, email: e.target.value }))} />
+                  <InputGroup label="Kullanıcı Adı" value={profileForm.username} onChange={e => setProfileForm(f => ({ ...f, username: e.target.value }))} />
+                  <InputGroup label="Firma" value={currentUser?.companyName || '—'} readOnly />
                 </div>
-                <button className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>
-                  <Save size={16} /> Kaydet
+                <button className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={handleSaveProfile} disabled={profileSaving}>
+                  <Save size={16} /> {profileSaving ? 'Kaydediliyor...' : 'Kaydet'}
                 </button>
               </div>
             </div>
@@ -186,10 +207,10 @@ const TabButton = ({ active, onClick, icon, label }) => (
   </button>
 );
 
-const InputGroup = ({ label, defaultValue, readOnly }) => (
+const InputGroup = ({ label, value, onChange, readOnly }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
     <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-dim)' }}>{label}</label>
-    <input className="input" defaultValue={defaultValue} readOnly={readOnly} style={readOnly ? { opacity: 0.6 } : {}} />
+    <input className="input" value={value} onChange={onChange || (() => {})} readOnly={readOnly} style={readOnly ? { opacity: 0.6 } : {}} />
   </div>
 );
 

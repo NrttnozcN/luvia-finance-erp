@@ -2,16 +2,19 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { RefreshCcw, Package, Users, Wallet, Building2, CheckCircle2, ShieldAlert, Play, History } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const fmt = (v) => `₺${Number(v || 0).toLocaleString('tr-TR')}`;
 
 const BulkTransfers = () => {
+  const cid = useAuthStore(s => s.currentUser)?.company_id;
   const [counts, setCounts] = useState({ stock: 0, customers: 0, kasa: 0, banka: 0 });
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    if (!cid) return;
     const fetchCounts = async () => {
       setLoading(true);
       const [
@@ -19,9 +22,9 @@ const BulkTransfers = () => {
         { count: custCount },
         { data: trans },
       ] = await Promise.all([
-        supabase.from('materials').select('*', { count: 'exact', head: true }),
-        supabase.from('customers').select('*', { count: 'exact', head: true }),
-        supabase.from('finance_transactions').select('type, account_type, amount'),
+        supabase.from('materials').select('*', { count: 'exact', head: true }).eq('company_id', cid),
+        supabase.from('customers').select('*', { count: 'exact', head: true }).eq('company_id', cid),
+        supabase.from('finance_transactions').select('type, account_type, amount').eq('company_id', cid),
       ]);
 
       const kasaBal = (trans || [])
@@ -35,7 +38,7 @@ const BulkTransfers = () => {
       setLoading(false);
     };
     fetchCounts();
-  }, []);
+  }, [cid]);
 
   const handleStart = () => {
     setRunning(true);

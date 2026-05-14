@@ -154,7 +154,7 @@ const Invoices = ({ initialView = 'list' }) => {
       const matrah = Number(item.quantity) * Number(item.unit_price);
       const kdv    = matrah * item.vat_rate / 100;
       const tevk   = kdv * item.tevkifat_rate;
-      return matrah + kdv + tevk;
+      return matrah + kdv - tevk;
     };
     const total = newInvoice.items.reduce((acc, item) => acc + itemCalc(item), 0);
 
@@ -186,7 +186,7 @@ const Invoices = ({ initialView = 'list' }) => {
       quantity: item.quantity,
       unit_price: item.unit_price,
       vat_rate: item.vat_rate,
-      total_price: (() => { const m = Number(item.quantity)*Number(item.unit_price); return m + m*(item.vat_rate/100)*item.tevkifat_rate; })(),
+      total_price: (() => { const m = Number(item.quantity)*Number(item.unit_price); const kdv = m*(item.vat_rate/100); return m + kdv - kdv*item.tevkifat_rate; })(),
       allocation_type: item.allocation_type,
       allocation_id: item.allocation_id || null
     }));
@@ -328,7 +328,7 @@ const Invoices = ({ initialView = 'list' }) => {
     const matrahTop = newInvoice.items.reduce((a, it) => a + Number(it.quantity) * Number(it.unit_price), 0);
     const kdvTop    = newInvoice.items.reduce((a, it) => a + Number(it.quantity) * Number(it.unit_price) * it.vat_rate / 100, 0);
     const tevkTop   = newInvoice.items.reduce((a, it) => a + Number(it.quantity) * Number(it.unit_price) * it.vat_rate / 100 * it.tevkifat_rate, 0);
-    const odenecek  = matrahTop + kdvTop + tevkTop;
+    const odenecek  = matrahTop + kdvTop - tevkTop;
 
     return (
       <div className="invoice-create" style={{ maxWidth: '1100px' }}>
@@ -413,7 +413,7 @@ const Invoices = ({ initialView = 'list' }) => {
                 const matrah      = Number(item.quantity) * Number(item.unit_price);
                 const kdvTutar    = matrah * item.vat_rate / 100;
                 const tevkTutar   = kdvTutar * item.tevkifat_rate;
-                const kdvDahil    = matrah + kdvTutar + tevkTutar;
+                const kdvDahil    = matrah + kdvTutar - tevkTutar;
                 const err = itemErrors[idx] || {};
                 return (
                   <div key={item.id} style={{ padding: '1.5rem', background: 'var(--bg-main)', borderRadius: '12px', border: `1px solid ${Object.values(err).some(v=>v) ? '#ef4444' : 'var(--border)'}` }}>
@@ -555,7 +555,7 @@ const Invoices = ({ initialView = 'list' }) => {
             <div style={{ paddingLeft: '2rem', borderLeft: '2px solid var(--border)' }}>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '0.25rem', fontWeight: '600' }}>Ödenecek Tutar</p>
               <p style={{ fontWeight: '800', fontSize: '1.5rem', color: 'var(--primary)' }}>₺{fmt(odenecek)}</p>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>KDV Hariç + KDV{tevkTop > 0 ? ' + Tevkifat' : ''}</p>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>KDV Hariç + KDV{tevkTop > 0 ? ' - Tevkifat' : ''}</p>
             </div>
           </div>
           <button className="btn btn-primary" style={{ padding: '0.9rem 2.5rem', fontSize: '1rem', fontWeight: '800', flexShrink: 0 }} onClick={handleSaveInvoice}>

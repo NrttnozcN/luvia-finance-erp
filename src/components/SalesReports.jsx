@@ -1,29 +1,46 @@
 import { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Target, FileText, Users2 } from 'lucide-react';
+import { BarChart3, TrendingUp, Target, FileText, Users2, Download } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const fmt = (v) => `₺${Number(v || 0).toLocaleString('tr-TR')}`;
 
 const SalesReports = () => {
+  const cid = useAuthStore(s => s.currentUser)?.company_id;
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!cid) return;
     const fetchData = async () => {
       setLoading(true);
       const { data } = await supabase
         .from('invoices')
         .select('*, customers(name)')
+        .eq('company_id', cid)
         .order('date', { ascending: false });
       setInvoices(data || []);
       setLoading(false);
     };
     fetchData();
-  }, []);
+  }, [cid]);
+
+  const exportCSV = () => {
+    const headers = ['Fatura No', 'Cari', 'Tarih', 'Tutar', 'Durum'];
+    const rows = invoices.map(inv => [
+      inv.invoice_no, inv.customers?.name || '', inv.date || '',
+      Number(inv.total_amount || 0).toFixed(2), inv.status || 'Bekliyor',
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'satis_raporu.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const thisMonthKey = new Date().toISOString().slice(0, 7);
   const thisMonthSales = invoices
@@ -61,6 +78,9 @@ const SalesReports = () => {
           <h1 style={{ fontSize: '2rem' }}>Satış & Karlılık Raporları</h1>
           <p className="text-muted">Ciro hedeflerinizi, karlılık analizlerinizi ve satış performansınızı izleyin.</p>
         </div>
+        <button className="btn btn-primary" onClick={exportCSV} disabled={invoices.length === 0}>
+          <Download size={18} /> CSV İndir
+        </button>
       </header>
 
       <div className="grid grid-cols-4" style={{ marginBottom: '2rem' }}>

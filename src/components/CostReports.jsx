@@ -6,15 +6,18 @@ import {
   Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const fmt = (v) => `₺${Number(v || 0).toLocaleString('tr-TR')}`;
 
 const CostReports = () => {
+  const cid = useAuthStore(s => s.currentUser)?.company_id;
   const [fuelLogs, setFuelLogs] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [personnel, setPersonnel] = useState([]);
   useEffect(() => {
+    if (!cid) return;
     const fetchAll = async () => {
       const [
         { data: fuels },
@@ -22,10 +25,10 @@ const CostReports = () => {
         { data: vehs },
         { data: persList },
       ] = await Promise.all([
-        supabase.from('fuel_logs').select('total_amount, vehicle_id, created_at'),
-        supabase.from('invoices').select('total_amount, date'),
-        supabase.from('vehicles').select('id, plate'),
-        supabase.from('personnel').select('salary'),
+        supabase.from('fuel_logs').select('total_amount, vehicle_id, created_at').eq('company_id', cid),
+        supabase.from('invoices').select('total_amount, date').eq('company_id', cid),
+        supabase.from('vehicles').select('id, plate').eq('company_id', cid),
+        supabase.from('employees').select('salary').eq('company_id', cid),
       ]);
       setFuelLogs(fuels || []);
       setInvoices(invs || []);
@@ -33,7 +36,25 @@ const CostReports = () => {
       setPersonnel(persList || []);
     };
     fetchAll();
-  }, []);
+  }, [cid]);
+
+  const exportCSV = () => {
+    const fuelTotal = fuelLogs.reduce((s, f) => s + Number(f.total_amount), 0);
+    const invCosts = invoices.reduce((s, i) => s + Number(i.total_amount), 0);
+    const personnelTotal = personnel.reduce((s, p) => s + Number(p.salary || 0), 0);
+    const rows = [
+      ['Maliyet Kalemi', 'Tutar'],
+      ['Akaryakıt Giderleri', fuelTotal.toFixed(2)],
+      ['Fatura Giderleri', invCosts.toFixed(2)],
+      ['Personel Maaşları', personnelTotal.toFixed(2)],
+      ['Toplam Maliyet', (fuelTotal + invCosts + personnelTotal).toFixed(2)],
+    ];
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'maliyet_raporu.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const fuelTotal = fuelLogs.reduce((s, f) => s + Number(f.total_amount), 0);
   const personnelTotal = personnel.reduce((s, p) => s + Number(p.salary || 0), 0);
@@ -81,7 +102,7 @@ const CostReports = () => {
           <h1 style={{ fontSize: '2rem' }}>Maliyet Raporları</h1>
           <p className="text-muted">Tesis, araç ve personel bazlı operasyonel maliyetlerinizi analiz edin.</p>
         </div>
-        <button className="btn btn-primary">
+        <button className="btn btn-primary" onClick={exportCSV}>
           <BarChart3 size={18} /> Dışa Aktar
         </button>
       </header>

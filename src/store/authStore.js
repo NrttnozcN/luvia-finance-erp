@@ -16,7 +16,7 @@ export const MODULE_MATRIX = [
   { group: 'İnsan Kaynakları',  items: ['personnel_def', 'personnel_payroll', 'personnel_pos'] },
   { group: 'Muhasebe & Defter', items: ['ledgers', 'transfers'] },
   { group: 'Raporlama',         items: ['costs', 'sales', 'logs', 'cari_rapor', 'kasa_rapor'] },
-  { group: 'Sistem',            items: ['alerts', 'settings', 'definitions'] },
+  { group: 'Sistem',            items: ['alerts', 'settings', 'definitions', 'support_tickets'] },
 ];
 
 export const MODULE_LABELS = {
@@ -34,7 +34,7 @@ export const MODULE_LABELS = {
   logs:       'Döküman Yönetimi',    cari_rapor: 'Cari Hareket Raporu',
   kasa_rapor: 'Kasa Hareket Raporu',
   alerts:     'Uyarı Merkezi',       settings:   'Sistem Ayarları',
-  definitions: 'Tanımlamalar',
+  definitions: 'Tanımlamalar',       support_tickets: 'Destek Talepleri',
 };
 
 // Geçiş güvenliği: role_id atanmamış mevcut kullanıcılar için fallback
@@ -121,6 +121,7 @@ const useAuthStore = create(
 
       logout: () => set({ currentUser: null }),
       clearError: () => set({ loginError: null }),
+      updateUser: (updates) => set(state => ({ currentUser: { ...state.currentUser, ...updates } })),
 
       canAccess: (tab) => {
         const user = get().currentUser;

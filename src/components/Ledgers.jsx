@@ -4,6 +4,7 @@ import {
   FileSpreadsheet, Search,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import useAuthStore from '../store/authStore';
 
 const PAGE_SIZE = 15;
 const fmt = (v) => `₺${Number(v || 0).toLocaleString('tr-TR')}`;
@@ -18,6 +19,7 @@ const EmptyState = ({ icon, title, description }) => (
 );
 
 const Ledgers = () => {
+  const cid = useAuthStore(s => s.currentUser)?.company_id;
   const [invoices, setInvoices] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [materials, setMaterials] = useState([]);
@@ -30,6 +32,7 @@ const Ledgers = () => {
   const [dateTo, setDateTo] = useState('');
 
   useEffect(() => {
+    if (!cid) return;
     const fetchAll = async () => {
       setLoading(true);
       const [
@@ -37,9 +40,9 @@ const Ledgers = () => {
         { data: trans },
         { data: mats },
       ] = await Promise.all([
-        supabase.from('invoices').select('*, customers(name)').order('date', { ascending: false }),
-        supabase.from('finance_transactions').select('*').order('created_at', { ascending: false }),
-        supabase.from('materials').select('*').order('name'),
+        supabase.from('invoices').select('*, customers(name)').eq('company_id', cid).order('date', { ascending: false }),
+        supabase.from('finance_transactions').select('*').eq('company_id', cid).order('created_at', { ascending: false }),
+        supabase.from('materials').select('*').eq('company_id', cid).order('name'),
       ]);
       setInvoices(invs || []);
       setTransactions(trans || []);
@@ -47,7 +50,7 @@ const Ledgers = () => {
       setLoading(false);
     };
     fetchAll();
-  }, []);
+  }, [cid]);
 
   const ledgerTabs = [
     { id: 'mizan',  label: 'Genel Mizan',       icon: <Table size={18} /> },
@@ -124,6 +127,35 @@ const Ledgers = () => {
   const totalPages = activeLedger === 'fiş'  ? Math.ceil(allFisler.length / PAGE_SIZE)
                    : activeLedger === 'cari' ? Math.ceil(cariRows.length  / PAGE_SIZE) : 1;
 
+  const exportExcel = () => {
+    let rows = [];
+    if (activeLedger === 'mizan') {
+      rows = [['Hesap Kodu', 'Hesap Adı', 'Borç', 'Alacak', 'Bakiye (B)', 'Bakiye (A)'],
+        ...mizanRows.map(r => [r.code, r.accountName, r.borc, r.alacak, r.bakiyeBorc, r.bakiyeAlacak])];
+    } else if (activeLedger === 'fiş') {
+      rows = [['Fatura No', 'Cari', 'Tarih', 'Tutar'],
+        ...allFisler.map(inv => [inv.invoice_no, inv.customers?.name || '', inv.date || '', inv.total_amount])];
+    } else if (activeLedger === 'cari') {
+      rows = [['Tarih', 'Referans', 'Açıklama', 'Borç', 'Alacak', 'Bakiye'],
+        ...cariRows.map(r => [r.date || '', r.ref, r.desc, r.borc, r.alacak, r.bakiye])];
+    } else if (activeLedger === 'cash') {
+      rows = [['Tarih', 'Hesap', 'Açıklama', 'Giriş', 'Çıkış'],
+        ...kasaRows.map(t => [fmtDate(t.created_at), t.account_name, t.description || t.type,
+          t.type === 'Tahsilat' ? t.amount : '', t.type !== 'Tahsilat' ? t.amount : ''])];
+    } else if (activeLedger === 'bank') {
+      rows = [['Tarih', 'Hesap', 'Açıklama', 'Giriş', 'Çıkış'],
+        ...bankaRows.map(t => [fmtDate(t.created_at), t.account_name, t.description || t.type,
+          t.type === 'Tahsilat' ? t.amount : '', t.type !== 'Tahsilat' ? t.amount : ''])];
+    } else {
+      rows = [['Malzeme', 'Kategori', 'Birim'], ...materials.map(m => [m.name, m.category || '', m.unit || ''])];
+    }
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `defter_${activeLedger}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
@@ -135,7 +167,7 @@ const Ledgers = () => {
           <button className="btn btn-ghost" style={{ background: 'white' }} onClick={() => window.print()}>
             <Printer size={18} /> Yazdır
           </button>
-          <button className="btn btn-primary">
+          <button className="btn btn-primary" onClick={exportExcel}>
             <Download size={18} /> Excel'e Aktar
           </button>
         </div>

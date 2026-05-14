@@ -98,7 +98,7 @@ const Definitions = () => {
   };
 
   const fetchKasalar = async () => {
-    const { data } = await supabase.from('kasalar').select('*').order('name');
+    const { data } = await supabase.from('kasalar').select('*').eq('company_id', cid).order('name');
     setKasalar(data || []);
   };
 
@@ -144,15 +144,7 @@ const Definitions = () => {
     else if (activeTab === 'users')    { fetchUsers(); fetchRoles(); }
     else if (activeTab === 'roles')    fetchRoles();
     else if (activeTab === 'doc_cats') fetchDocCats();
-    
-    console.log('Definitions - Active Tab:', activeTab, 'Company ID:', cid);
   }, [activeTab, cid]);
-
-  useEffect(() => {
-    if (materials.length > 0) {
-      console.log('Definitions - Materials Loaded:', materials.length);
-    }
-  }, [materials]);
 
   // ─── Material CRUD ───────────────────────────────────────────────────────────
   const handleSaveMaterial = async () => {
@@ -196,7 +188,7 @@ const Definitions = () => {
         name:       String(r[0] || '').trim(),
         category:   String(r[1] || '').trim() || (activeTab === 'gider' ? 'Gider' : 'Yedek Parça'),
         unit:       String(r[2] || '').trim() || 'Adet',
-        item_type:  activeTab === 'gider' ? 'Gider' : 'Malzeme',
+        item_type:  activeTab === 'gider' ? 'Gider' : activeTab === 'gelir' ? 'Gelir' : 'Malzeme',
         company_id: cid,
       }));
     setBulkPreview(items);
@@ -213,7 +205,7 @@ const Definitions = () => {
       setBulkPreview([]);
       setBulkFileName('');
       if (fileInputRef.current) fileInputRef.current.value = '';
-      fetchMaterials(activeTab === 'gider' ? 'Gider' : 'Malzeme');
+      fetchMaterials(activeTab === 'gider' ? 'Gider' : activeTab === 'gelir' ? 'Gelir' : 'Malzeme');
     }
     setLoading(false);
   };
@@ -243,13 +235,13 @@ const Definitions = () => {
   const handleDeleteMaterial = async (id) => {
     if (!window.confirm('Bu kartı silmek istediğinizden emin misiniz?')) return;
     await supabase.from('materials').delete().eq('id', id);
-    fetchMaterials(activeTab === 'gider' ? 'Gider' : 'Malzeme');
+    fetchMaterials(activeTab === 'gider' ? 'Gider' : activeTab === 'gelir' ? 'Gelir' : 'Malzeme');
   };
 
   // ─── Kasa CRUD ───────────────────────────────────────────────────────────────
   const handleSaveKasa = async () => {
     if (!kasaForm.name.trim()) { alert('Kasa adı zorunludur.'); return; }
-    const { error } = await supabase.from('kasalar').insert([{ ...kasaForm }]);
+    const { error } = await supabase.from('kasalar').insert([{ ...kasaForm, company_id: cid }]);
     if (error) { alert(error.message); return; }
     setShowKasaModal(false);
     setKasaForm({ name: '', type: 'Kasa' });

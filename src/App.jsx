@@ -55,6 +55,7 @@ const getInitials = (name) => {
 const App = () => {
   const [activeModule, setActiveModule] = useState('dashboard');
   const currentUser = useAuthStore(s => s.currentUser);
+  const cid = currentUser?.company_id;
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearch, setShowSearch] = useState(false);
@@ -78,19 +79,19 @@ const App = () => {
 
   // SQL'DEN GERÇEK İSTATİSTİKLERİ ÇEK
   const fetchDashboardStats = async () => {
-    
+    if (!cid) return;
     // 1. Toplam Satış (Faturalar)
-    const { data: invs } = await supabase.from('invoices').select('total_amount');
+    const { data: invs } = await supabase.from('invoices').select('total_amount').eq('company_id', cid);
     const totalSales = invs?.reduce((acc, curr) => acc + Number(curr.total_amount), 0) || 0;
 
     // 2. Araç Sayısı
-    const { count: vCount } = await supabase.from('vehicles').select('*', { count: 'exact', head: true });
+    const { count: vCount } = await supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('company_id', cid);
 
     // 3. Cari Sayısı
-    const { count: cCount } = await supabase.from('customers').select('*', { count: 'exact', head: true });
+    const { count: cCount } = await supabase.from('customers').select('*', { count: 'exact', head: true }).eq('company_id', cid);
 
     // 4. Akaryakıt Maliyeti
-    const { data: fuel } = await supabase.from('fuel_logs').select('total_amount');
+    const { data: fuel } = await supabase.from('fuel_logs').select('total_amount').eq('company_id', cid);
     const fuelCost = fuel?.reduce((acc, curr) => acc + Number(curr.total_amount), 0) || 0;
 
     setStats({
@@ -103,10 +104,14 @@ const App = () => {
   };
 
   const fetchUpcomingAlerts = async () => {
+    if (!cid) return;
+    const { data: compVehs } = await supabase.from('vehicles').select('id').eq('company_id', cid);
+    const vIds = (compVehs || []).map(v => v.id);
+    if (!vIds.length) { setUpcomingAlerts([]); return; }
     const future = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0];
     const [{ data: insps }, { data: insurs }] = await Promise.all([
-      supabase.from('vehicle_inspections').select('id, type, expiry_date, vehicles(plate)').not('expiry_date', 'is', null).lte('expiry_date', future).order('expiry_date').limit(10),
-      supabase.from('vehicle_insurances').select('id, insurance_type, expiry_date, company, vehicles(plate)').not('expiry_date', 'is', null).lte('expiry_date', future).order('expiry_date').limit(10),
+      supabase.from('vehicle_inspections').select('id, type, expiry_date, vehicles(plate)').in('vehicle_id', vIds).not('expiry_date', 'is', null).lte('expiry_date', future).order('expiry_date').limit(10),
+      supabase.from('vehicle_insurances').select('id, insurance_type, expiry_date, company, vehicles(plate)').in('vehicle_id', vIds).not('expiry_date', 'is', null).lte('expiry_date', future).order('expiry_date').limit(10),
     ]);
     const items = [
       ...(insps || []).map(i => ({ id: `i-${i.id}`, category: 'Muayene', label: `${i.type} — ${i.vehicles?.plate || ''}`, expiry: i.expiry_date, days: daysUntil(i.expiry_date) })),
@@ -178,9 +183,9 @@ const App = () => {
     setShowSearch(true);
     const term = `%${q.trim()}%`;
     const [{ data: custs }, { data: invs }, { data: vehs }] = await Promise.all([
-      supabase.from('customers').select('id, name').ilike('name', term).limit(4),
-      supabase.from('invoices').select('id, invoice_no').ilike('invoice_no', term).limit(4),
-      supabase.from('vehicles').select('id, plate').ilike('plate', term).limit(4),
+      supabase.from('customers').select('id, name').ilike('name', term).eq('company_id', cid).limit(4),
+      supabase.from('invoices').select('id, invoice_no').ilike('invoice_no', term).eq('company_id', cid).limit(4),
+      supabase.from('vehicles').select('id, plate').ilike('plate', term).eq('company_id', cid).limit(4),
     ]);
     const results = [
       ...(custs || []).map(r => ({ label: r.name, sub: 'Cari', tab: 'cariler' })),
