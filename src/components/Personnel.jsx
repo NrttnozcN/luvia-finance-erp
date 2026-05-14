@@ -149,7 +149,7 @@ const DefinitionTab = ({ cid }) => {
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('employees').select('*, facilities(name)').eq('company_id', cid).order('full_name');
+    const { data } = await supabase.from('employees').select('*').eq('company_id', cid).order('full_name');
     setEmployees((data || []).map(e => ({ ...e, status: e.status || 'Aktif' })));
     setLoading(false);
   }, [cid]);
@@ -191,7 +191,7 @@ const DefinitionTab = ({ cid }) => {
 
   const handleExport = () => {
     const csv = '﻿Ad Soyad,TC Kimlik,Telefon,Görev,Departman,Tesis,İşe Giriş,Maaş,Durum\n'
-      + filtered.map(e => [`"${e.full_name||''}"`,`"${e.tc_kimlik||''}"`,`"${e.phone||''}"`,`"${e.job_title||''}"`,`"${e.department||''}"`,`"${e.facilities?.name||''}"`, e.hire_date||'', e.salary||'', e.status||''].join(',')).join('\n');
+      + filtered.map(e => [`"${e.full_name||''}"`,`"${e.tc_kimlik||''}"`,`"${e.phone||''}"`,`"${e.job_title||''}"`,`"${e.department||''}"`,`"${facilities.find(f => f.id === e.facility_id)?.name||''}"`, e.hire_date||'', e.salary||'', e.status||''].join(',')).join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     Object.assign(document.createElement('a'), { href: url, download: 'personel.csv' }).click();
     URL.revokeObjectURL(url);
@@ -255,7 +255,7 @@ const DefinitionTab = ({ cid }) => {
                     <p>{e.job_title || <span style={{ color: 'var(--text-dim)' }}>—</span>}</p>
                     {e.department && <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{e.department}</p>}
                   </td>
-                  <td style={{ padding: '1rem 1.25rem', fontSize: '0.88rem' }}>{e.facilities?.name || <span style={{ color: 'var(--text-dim)' }}>Merkez</span>}</td>
+                  <td style={{ padding: '1rem 1.25rem', fontSize: '0.88rem' }}>{facilities.find(f => f.id === e.facility_id)?.name || <span style={{ color: 'var(--text-dim)' }}>Merkez</span>}</td>
                   <td style={{ padding: '1rem 1.25rem', fontSize: '0.88rem' }}>{e.hire_date ? fmtDate(e.hire_date) : <span style={{ color: 'var(--text-dim)' }}>—</span>}</td>
                   <td style={{ padding: '1rem 1.25rem', fontSize: '0.88rem', fontWeight: '600' }}>{e.salary ? `₺${Number(e.salary).toLocaleString('tr-TR')}` : <span style={{ color: 'var(--text-dim)' }}>—</span>}</td>
                   <td style={{ padding: '1rem 1.25rem' }}>
