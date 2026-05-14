@@ -746,6 +746,15 @@ const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) =>
     fontWeight: active ? '600' : undefined,
   });
 
+  // Dinamik kategorileri materials listesinden çıkar ve sabitlerle birleştir
+  const dynamicGiderCats = [...new Set(materials.filter(m => m.item_type === 'Gider').map(m => m.category).filter(Boolean))];
+  const dynamicGelirCats = [...new Set(materials.filter(m => m.item_type === 'Gelir').map(m => m.category).filter(Boolean))];
+  const dynamicMalzemeCats = [...new Set(materials.filter(m => m.item_type === 'Malzeme').map(m => m.category).filter(Boolean))];
+
+  const finalGider = [...new Set([...GIDER_CARDS, ...dynamicGiderCats])];
+  const finalGelir = [...new Set([...GELIR_CARDS, ...dynamicGelirCats])];
+  const finalMalzeme = [...new Set([...MALZEME_CATS, ...dynamicMalzemeCats])];
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
       {/* Adım 1 — Kart / Kategori */}
@@ -755,20 +764,20 @@ const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) =>
           <option value="">Seçiniz...</option>
           {isAlis ? (
             <>
-              <optgroup label="── Gelir Kartları ──">
-                {GELIR_CARDS.map(c => <option key={c} value={c}>{c}</option>)}
+              <optgroup label="── Gider Kartları ──">
+                {finalGider.map(c => <option key={c} value={c}>{c}</option>)}
               </optgroup>
               <optgroup label="── Malzeme Kategorileri ──">
-                {MALZEME_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                {finalMalzeme.map(c => <option key={c} value={c}>{c}</option>)}
               </optgroup>
             </>
           ) : (
             <>
-              <optgroup label="── Gider Kartları ──">
-                {GIDER_CARDS.map(c => <option key={c} value={c}>{c}</option>)}
+              <optgroup label="── Gelir Kartları ──">
+                {finalGelir.map(c => <option key={c} value={c}>{c}</option>)}
               </optgroup>
               <optgroup label="── Malzeme Kategorileri ──">
-                {MALZEME_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                {finalMalzeme.map(c => <option key={c} value={c}>{c}</option>)}
               </optgroup>
             </>
           )}
