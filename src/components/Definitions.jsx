@@ -149,6 +149,19 @@ const Definitions = () => {
   // ─── Material CRUD ───────────────────────────────────────────────────────────
   const handleSaveMaterial = async () => {
     if (!matForm.name.trim()) { alert('Tanım adı zorunludur.'); return; }
+    
+    // Aynı isimde kayıt var mı kontrolü (Aynı sekme tipinde - Gider/Gelir/Malzeme)
+    const duplicateCheck = materials.some(m => 
+      m.name.trim().toLowerCase() === matForm.name.trim().toLowerCase() && 
+      m.item_type === matForm.item_type &&
+      (!editMaterial || m.id !== editMaterial.id) // Düzenlenen kendisi ise sayma
+    );
+
+    if (duplicateCheck) {
+      alert(`"${matForm.name.trim()}" isminde bir kayıt zaten sistemde mevcut! Lütfen farklı bir isim giriniz.`);
+      return;
+    }
+
     const { name, category, unit, item_type } = matForm;
     const payload = { name, category, unit, item_type };
     let error;
@@ -446,6 +459,9 @@ const Definitions = () => {
               const validTopCards = topCards.filter(c => c !== digerLabel);
 
               const level2List = materials.filter(m => {
+                if (search) {
+                  return m.name?.toLowerCase().includes(search.toLowerCase());
+                }
                 if (!drillCard) return false;
                 if (drillCard === digerLabel) {
                   return !m.category || !validTopCards.includes(m.category) || m.category === digerLabel;
@@ -453,35 +469,46 @@ const Definitions = () => {
                 return m.category === drillCard;
               });
 
-              const showMaterialTable = !!drillCard;
-              const showCardGrid      = !drillCard;
+              const showMaterialTable = !!drillCard || !!search;
+              const showCardGrid      = !drillCard && !search;
 
-              const filtered = level2List.filter(m =>
-                !search || m.name?.toLowerCase().includes(search.toLowerCase())
-              );
+              const filtered = level2List;
 
               return (
                 <>
-                  {/* Breadcrumb + Add Button */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem', gap: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button onClick={() => { setDrillCard(null); setSearch(''); }}
-                      style={{ background: 'none', border: 'none', cursor: drillCard ? 'pointer' : 'default',
-                        fontWeight: '700', fontSize: '0.92rem',
-                        color: drillCard ? 'var(--primary)' : 'var(--text)',
-                        textDecoration: drillCard ? 'underline' : 'none', padding: 0 }}>
-                      {isGider ? 'Gider Kartları' : isGelir ? 'Gelir Kartları' : 'Malzeme Kartları'}
-                    </button>
-                    {drillCard && (
-                      <>
-                        <ChevronRight size={14} style={{ color: 'var(--text-dim)' }} />
-                        <span style={{ fontWeight: '700', fontSize: '0.92rem' }}>{drillCard}</span>
-                      </>
-                    )}
-                  </div>
-                  <button className="btn btn-primary" onClick={handleAddClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-                    <Plus size={16} /> {addButtonLabel}
-                  </button>
+                  {/* Breadcrumb + Search + Add Button */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button onClick={() => { setDrillCard(null); setSearch(''); }}
+                        style={{ background: 'none', border: 'none', cursor: (drillCard || search) ? 'pointer' : 'default',
+                          fontWeight: '700', fontSize: '0.92rem',
+                          color: (drillCard || search) ? 'var(--primary)' : 'var(--text)',
+                          textDecoration: (drillCard || search) ? 'underline' : 'none', padding: 0 }}>
+                        {isGider ? 'Gider Kartları' : isGelir ? 'Gelir Kartları' : 'Malzeme Kartları'}
+                      </button>
+                      {drillCard && !search && (
+                        <>
+                          <ChevronRight size={14} style={{ color: 'var(--text-dim)' }} />
+                          <span style={{ fontWeight: '700', fontSize: '0.92rem' }}>{drillCard}</span>
+                        </>
+                      )}
+                      {search && (
+                        <>
+                          <ChevronRight size={14} style={{ color: 'var(--text-dim)' }} />
+                          <span style={{ fontWeight: '700', fontSize: '0.92rem' }}>Arama Sonuçları</span>
+                        </>
+                      )}
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div className="search-box" style={{ width: '240px' }}>
+                        <Search size={15} className="text-dim" />
+                        <input type="text" placeholder="Tüm tanımlarda ara..." value={search} onChange={e => setSearch(e.target.value)} />
+                      </div>
+                      <button className="btn btn-primary" onClick={handleAddClick} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                        <Plus size={16} /> {addButtonLabel}
+                      </button>
+                    </div>
                   </div>
 
                   {loading && <p style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>Yükleniyor...</p>}
@@ -531,10 +558,6 @@ const Definitions = () => {
                         <button className="btn btn-primary" style={{ fontSize: '0.82rem', padding: '0.55rem 1rem', flexShrink: 0 }} onClick={handleOpenAddModal}>
                           <Plus size={15} /> Yeni Kalem Ekle
                         </button>
-                        <div className="search-box" style={{ width: '240px' }}>
-                          <Search size={15} className="text-dim" />
-                          <input type="text" placeholder="Ara..." value={search} onChange={e => setSearch(e.target.value)} />
-                        </div>
                       </div>
                       {filtered.length === 0 ? (
                         <p style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>Bu kategoride kalem bulunamadı.</p>
