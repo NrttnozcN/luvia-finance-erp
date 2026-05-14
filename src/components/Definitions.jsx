@@ -751,7 +751,11 @@ const Definitions = () => {
         const isGelir       = isMalzemeTab ? matForm.item_type === 'Gelir' : activeTab === 'gelir';
         const step1Label    = isGider ? 'Gider Kartı' : isGelir ? 'Gelir Kartı' : 'Kategori';
         const step1Locked   = !editMaterial && !!matForm.category;
-        const step1Options  = isGider ? GIDER_CARDS : isGelir ? GELIR_CARDS : MALZEME_CATS;
+        
+        const defaultOptions = isGider ? GIDER_CARDS : isGelir ? GELIR_CARDS : MALZEME_CATS;
+        const dynamicOptions = [...new Set(materials.filter(m => m.item_type === (isGider ? 'Gider' : isGelir ? 'Gelir' : 'Malzeme')).map(m => m.category).filter(Boolean))];
+        const step1Options  = [...new Set([...defaultOptions, ...dynamicOptions])];
+        
         const cardMeta      = CARD_META[matForm.category] || {};
 
         return (
@@ -784,11 +788,16 @@ const Definitions = () => {
 
                 {/* ADIM 1 */}
                 <StepRow num={1} label={step1Label} locked={step1Locked} lockedVal={matForm.category} meta={cardMeta}>
-                  <select className="input" value={matForm.category}
-                    onChange={e => setMatForm({ ...matForm, category: e.target.value })}>
-                    <option value="">Seçiniz...</option>
-                    {step1Options.map(c => <option key={c}>{c}</option>)}
-                  </select>
+                  <input 
+                    className="input" 
+                    value={matForm.category}
+                    onChange={e => setMatForm({ ...matForm, category: e.target.value })}
+                    list="categoryOptions"
+                    placeholder="Listeden seçin veya yeni yazın..."
+                  />
+                  <datalist id="categoryOptions">
+                    {step1Options.map(c => <option key={c} value={c} />)}
+                  </datalist>
                 </StepRow>
 
                 <StepConnector active={!!matForm.category} />
