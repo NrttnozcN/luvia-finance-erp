@@ -7,6 +7,10 @@ import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
 
 
+const GIDER_CARDS  = ['Araç ve İş Makinesi Giderleri', 'Akaryakıt Giderleri', 'Büro Malzemesi Giderleri', 'Yemek ve Gıda Giderleri', 'Tesis Giderleri', 'Personel Giderleri', 'Diğer Giderler'];
+const GELIR_CARDS  = ['Hakediş Geliri', 'Ürün Satış Geliri', 'Hizmet Satış Geliri', 'Diğer Gelirler'];
+const MALZEME_CATS = ['Yedek Parça', 'Akaryakıt', 'Yağ & Filtre', 'Lastik', 'Büro Malzemesi', 'Gıda', 'Hizmet', 'Personel', 'Diğer'];
+
 const Invoices = ({ initialView = 'list' }) => {
   const currentUser = useAuthStore(s => s.currentUser);
   const cid = currentUser?.company_id;
@@ -86,7 +90,7 @@ const Invoices = ({ initialView = 'list' }) => {
     setView('detail');
     const { data } = await supabase
       .from('invoice_items')
-      .select('*, materials(name, unit)')
+      .select('*, materials(name, unit, category)')
       .eq('invoice_id', invoice.id);
     setDetailItems(data || []);
     setDetailLoading(false);
@@ -273,8 +277,17 @@ const Invoices = ({ initialView = 'list' }) => {
                   const kdv    = matrah * (it.vat_rate || 0) / 100;
                   return (
                     <tr key={idx} style={{ borderBottom: '1px solid var(--bg-main)' }}>
-                      <td style={{ padding: '0.85rem 1rem', fontWeight: '700', fontSize: '0.88rem' }}>{it.materials?.name || '—'}</td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.82rem', color: 'var(--text-dim)' }}>{it.description || '—'}</td>
+                      <td style={{ padding: '0.85rem 1rem' }}>
+                        <span style={{ fontWeight: '700', fontSize: '0.88rem', display: 'block' }}>{it.materials?.name || '—'}</span>
+                        {it.materials?.category && <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)', display: 'block', marginTop: '2px' }}>{it.materials.category}</span>}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem' }}>
+                        <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)', display: 'block' }}>{it.description || '—'}</span>
+                        {it.allocation_type === 'Araç'
+                          ? <span style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: '600', display: 'block', marginTop: '3px' }}>Araç: {vehicles.find(v => v.id === it.allocation_id)?.plate || '?'}</span>
+                          : <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: '600', display: 'block', marginTop: '3px' }}>Depoya</span>
+                        }
+                      </td>
                       <td style={{ padding: '0.85rem 1rem', fontSize: '0.88rem' }}>{it.quantity} {it.materials?.unit || ''}</td>
                       <td style={{ padding: '0.85rem 1rem', fontSize: '0.88rem' }}>₺{fmt(it.unit_price)}</td>
                       <td style={{ padding: '0.85rem 1rem', fontSize: '0.88rem' }}>%{it.vat_rate || 0}</td>
@@ -694,19 +707,13 @@ const InputGroup = ({ label, placeholder, type, value, onChange }) => (
 );
 
 const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) => {
-  // Alış: Gider + Malzeme (Gelir hariç) | Satış: Gelir + Malzeme (Gider hariç)
-  const typeFiltered = materials.filter(m =>
-    invoiceType === 'Alış Faturası' ? m.item_type !== 'Gelir' : m.item_type !== 'Gider'
-  );
-
+  const isAlis = invoiceType === 'Alış Faturası';
   const selectedMat = materials.find(m => m.id === value);
   const [selCat, setSelCat] = useState(selectedMat?.category || '');
 
   useEffect(() => { setSelCat(''); }, [invoiceType]);
 
-  const availableCats = [...new Set(typeFiltered.map(m => m.category).filter(Boolean))].sort();
-  const availableMats = selCat ? typeFiltered.filter(m => m.category === selCat) : [];
-
+  const availableMats = selCat ? materials.filter(m => m.category === selCat) : [];
   const handleCat = (c) => { setSelCat(c); onChange(''); };
 
   const selStyle = (active) => ({
@@ -718,12 +725,30 @@ const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) =>
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-      {/* Adım 1 — Kategori */}
-      <div style={{ flex: '0 0 200px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>1 · Kategori</span>
+      {/* Adım 1 — Kart / Kategori */}
+      <div style={{ flex: '0 0 220px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>1 · Kart / Kategori</span>
         <select className="input" style={selStyle(!!selCat)} value={selCat} onChange={e => handleCat(e.target.value)}>
           <option value="">Seçiniz...</option>
-          {availableCats.map(c => <option key={c} value={c}>{c}</option>)}
+          {isAlis ? (
+            <>
+              <optgroup label="── Gelir Kartları ──">
+                {GELIR_CARDS.map(c => <option key={c} value={c}>{c}</option>)}
+              </optgroup>
+              <optgroup label="── Malzeme Kategorileri ──">
+                {MALZEME_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+              </optgroup>
+            </>
+          ) : (
+            <>
+              <optgroup label="── Gider Kartları ──">
+                {GIDER_CARDS.map(c => <option key={c} value={c}>{c}</option>)}
+              </optgroup>
+              <optgroup label="── Malzeme Kategorileri ──">
+                {MALZEME_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+              </optgroup>
+            </>
+          )}
         </select>
       </div>
 

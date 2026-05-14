@@ -749,8 +749,9 @@ const Definitions = () => {
 
       {/* Malzeme/Gider Modal — Stepped */}
       {showMatModal && (() => {
-        const isGider = activeTab === 'gider';
-        const isGelir = activeTab === 'gelir';
+        const isMalzemeTab  = activeTab === 'malzeme';
+        const isGider       = isMalzemeTab ? matForm.item_type === 'Gider' : activeTab === 'gider';
+        const isGelir       = isMalzemeTab ? matForm.item_type === 'Gelir' : activeTab === 'gelir';
         const step1Label    = isGider ? 'Gider Kartı' : isGelir ? 'Gelir Kartı' : 'Kategori';
         const step1Locked   = !editMaterial && !!matForm.category;
         const step1Options  = isGider ? GIDER_CARDS : isGelir ? GELIR_CARDS : MALZEME_CATS;
@@ -767,6 +768,22 @@ const Definitions = () => {
               />
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+                {/* Kart Tipi — sadece Malzeme sekmesinde göster */}
+                {isMalzemeTab && (
+                  <>
+                    <div style={{ display: 'flex', gap: '0.5rem', padding: '0.25rem 0 1rem' }}>
+                      {[['Malzeme Kartı', 'Malzeme'], ['Gider Kartı', 'Gider'], ['Gelir Kartı', 'Gelir']].map(([lbl, val]) => (
+                        <button key={val} type="button"
+                          onClick={() => setMatForm({ ...matForm, item_type: val, category: '' })}
+                          style={{ flex: 1, padding: '0.55rem 0.25rem', fontSize: '0.78rem', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: '1.5px solid', borderColor: matForm.item_type === val ? 'var(--primary)' : 'var(--border)', background: matForm.item_type === val ? 'var(--primary-light)' : 'transparent', color: matForm.item_type === val ? 'var(--primary)' : 'var(--text-dim)', transition: 'all 0.15s' }}>
+                          {lbl}
+                        </button>
+                      ))}
+                    </div>
+                    <StepConnector active={true} />
+                  </>
+                )}
 
                 {/* ADIM 1 */}
                 <StepRow num={1} label={step1Label} locked={step1Locked} lockedVal={matForm.category} meta={cardMeta}>
