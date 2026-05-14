@@ -732,12 +732,35 @@ const InputGroup = ({ label, placeholder, type, value, onChange }) => (
 const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) => {
   const isAlis = invoiceType === 'Alış Faturası';
   const selectedMat = materials.find(m => m.id === value);
+  
   const [selCat, setSelCat] = useState(selectedMat?.category || '');
+  const [localProduct, setLocalProduct] = useState(selectedMat?.name || '');
+  const [listId] = useState(() => Math.random().toString(36).substr(2, 9));
 
-  useEffect(() => { setSelCat(''); }, [invoiceType]);
+  useEffect(() => { 
+    setSelCat(''); 
+    setLocalProduct('');
+  }, [invoiceType]);
+
+  useEffect(() => {
+    const m = materials.find(m => m.id === value);
+    setLocalProduct(m ? m.name : '');
+  }, [value, materials]);
 
   const availableMats = selCat ? materials.filter(m => m.category === selCat) : [];
-  const handleCat = (c) => { setSelCat(c); onChange(''); };
+  
+  const handleCat = (c) => { 
+    setSelCat(c); 
+    onChange(''); 
+    setLocalProduct('');
+  };
+
+  const handleProduct = (val) => {
+    setLocalProduct(val);
+    const matched = availableMats.find(m => m.name === val);
+    if (matched) onChange(matched.id);
+    else onChange('');
+  };
 
   const selStyle = (active) => ({
     fontSize: '0.82rem',
@@ -755,33 +778,24 @@ const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) =>
   const finalGelir = [...new Set([...GELIR_CARDS, ...dynamicGelirCats])];
   const finalMalzeme = [...new Set([...MALZEME_CATS, ...dynamicMalzemeCats])];
 
+  const categoryOptions = isAlis ? [...finalGider, ...finalMalzeme] : [...finalGelir, ...finalMalzeme];
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
       {/* Adım 1 — Kart / Kategori */}
       <div style={{ flex: '0 0 220px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
         <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>1 · Kart / Kategori</span>
-        <select className="input" style={selStyle(!!selCat)} value={selCat} onChange={e => handleCat(e.target.value)}>
-          <option value="">Seçiniz...</option>
-          {isAlis ? (
-            <>
-              <optgroup label="── Gider Kartları ──">
-                {finalGider.map(c => <option key={c} value={c}>{c}</option>)}
-              </optgroup>
-              <optgroup label="── Malzeme Kategorileri ──">
-                {finalMalzeme.map(c => <option key={c} value={c}>{c}</option>)}
-              </optgroup>
-            </>
-          ) : (
-            <>
-              <optgroup label="── Gelir Kartları ──">
-                {finalGelir.map(c => <option key={c} value={c}>{c}</option>)}
-              </optgroup>
-              <optgroup label="── Malzeme Kategorileri ──">
-                {finalMalzeme.map(c => <option key={c} value={c}>{c}</option>)}
-              </optgroup>
-            </>
-          )}
-        </select>
+        <input 
+          className="input" 
+          style={selStyle(!!selCat)} 
+          value={selCat} 
+          onChange={e => handleCat(e.target.value)}
+          list={`cat-${listId}`}
+          placeholder="Arayın veya seçin..."
+        />
+        <datalist id={`cat-${listId}`}>
+          {categoryOptions.map(c => <option key={c} value={c} />)}
+        </datalist>
       </div>
 
       <ChevronRight size={14} style={{ color: selCat ? 'var(--primary)' : 'var(--border)', flexShrink: 0, marginTop: '16px' }} />
@@ -789,10 +803,18 @@ const SteppedSelect = ({ value, materials, onChange, hasError, invoiceType }) =>
       {/* Adım 2 — Ürün/Hizmet */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
         <span style={{ fontSize: '0.68rem', fontWeight: '700', color: selCat ? 'var(--primary)' : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>2 · Ürün / Hizmet</span>
-        <select className="input" style={{ ...(hasError ? { borderColor: '#ef4444' } : selStyle(!!value)) }} value={value} onChange={e => onChange(e.target.value)} disabled={!selCat}>
-          <option value="">Seçiniz...</option>
-          {availableMats.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
+        <input 
+          className="input" 
+          style={{ ...(hasError ? { borderColor: '#ef4444' } : selStyle(!!value)) }} 
+          value={localProduct} 
+          onChange={e => handleProduct(e.target.value)} 
+          disabled={!selCat}
+          list={`prod-${listId}`}
+          placeholder={selCat ? "Ürün arayın..." : "Önce kategori seçin..."}
+        />
+        <datalist id={`prod-${listId}`}>
+          {availableMats.map(m => <option key={m.id} value={m.name} />)}
+        </datalist>
       </div>
     </div>
   );
