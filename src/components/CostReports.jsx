@@ -16,6 +16,9 @@ const CostReports = () => {
   const [invoices, setInvoices] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [personnel, setPersonnel] = useState([]);
+  const [facilities, setFacilities] = useState([]);
+  const [selectedFacility, setSelectedFacility] = useState('');
+
   useEffect(() => {
     if (!cid) return;
     const fetchAll = async () => {
@@ -24,30 +27,31 @@ const CostReports = () => {
         { data: invs },
         { data: vehs },
         { data: persList },
+        { data: facs },
       ] = await Promise.all([
         supabase.from('fuel_logs').select('total_amount, vehicle_id, created_at').eq('company_id', cid),
-        supabase.from('invoices').select('total_amount, date').eq('company_id', cid),
-        supabase.from('vehicles').select('id, plate').eq('company_id', cid),
-        supabase.from('employees').select('salary').eq('company_id', cid),
+        supabase.from('invoices').select('total_amount, date, facility_id').eq('company_id', cid),
+        supabase.from('vehicles').select('id, plate, facility_id').eq('company_id', cid),
+        supabase.from('employees').select('salary, facility_id').eq('company_id', cid),
+        supabase.from('facilities').select('id, name').eq('company_id', cid).order('name'),
       ]);
       setFuelLogs(fuels || []);
       setInvoices(invs || []);
       setVehicles(vehs || []);
       setPersonnel(persList || []);
+      setFacilities(facs || []);
     };
     fetchAll();
   }, [cid]);
 
   const exportCSV = () => {
-    const fuelTotal = fuelLogs.reduce((s, f) => s + Number(f.total_amount), 0);
-    const invCosts = invoices.reduce((s, i) => s + Number(i.total_amount), 0);
-    const personnelTotal = personnel.reduce((s, p) => s + Number(p.salary || 0), 0);
+    const facilityLabel = selectedFacility ? (facilities.find(f => f.id === selectedFacility)?.name || '') : 'Tüm Tesisler';
     const rows = [
-      ['Maliyet Kalemi', 'Tutar'],
-      ['Akaryakıt Giderleri', fuelTotal.toFixed(2)],
-      ['Fatura Giderleri', invCosts.toFixed(2)],
-      ['Personel Maaşları', personnelTotal.toFixed(2)],
-      ['Toplam Maliyet', (fuelTotal + invCosts + personnelTotal).toFixed(2)],
+      ['Maliyet Kalemi', 'Tutar', 'Tesis'],
+      ['Akaryakıt Giderleri', fuelTotal.toFixed(2), facilityLabel],
+      ['Fatura Giderleri', invCosts.toFixed(2), facilityLabel],
+      ['Personel Maaşları', personnelTotal.toFixed(2), facilityLabel],
+      ['Toplam Maliyet', totalCost.toFixed(2), facilityLabel],
     ];
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -56,9 +60,17 @@ const CostReports = () => {
     URL.revokeObjectURL(url);
   };
 
-  const fuelTotal = fuelLogs.reduce((s, f) => s + Number(f.total_amount), 0);
-  const personnelTotal = personnel.reduce((s, p) => s + Number(p.salary || 0), 0);
-  const invCosts = invoices.reduce((s, i) => s + Number(i.total_amount), 0);
+  const facilityVehicleIds = selectedFacility
+    ? vehicles.filter(v => v.facility_id === selectedFacility).map(v => v.id)
+    : null;
+
+  const filteredFuel      = selectedFacility ? fuelLogs.filter(f => facilityVehicleIds.includes(f.vehicle_id)) : fuelLogs;
+  const filteredInvoices  = selectedFacility ? invoices.filter(i => i.facility_id === selectedFacility) : invoices;
+  const filteredPersonnel = selectedFacility ? personnel.filter(p => p.facility_id === selectedFacility) : personnel;
+
+  const fuelTotal      = filteredFuel.reduce((s, f) => s + Number(f.total_amount), 0);
+  const personnelTotal = filteredPersonnel.reduce((s, p) => s + Number(p.salary || 0), 0);
+  const invCosts       = filteredInvoices.reduce((s, i) => s + Number(i.total_amount), 0);
   const totalCost = fuelTotal + invCosts + personnelTotal;
 
   const pieData = [
@@ -67,10 +79,11 @@ const CostReports = () => {
     { name: 'Personel', value: personnelTotal, color: '#94a3b8' },
   ].filter(d => d.value > 0);
 
-  const vehicleCostData = vehicles
+  const filteredVehicles = selectedFacility ? vehicles.filter(v => v.facility_id === selectedFacility) : vehicles;
+  const vehicleCostData = filteredVehicles
     .map(v => ({
       name: v.plate,
-      maliyet: fuelLogs
+      maliyet: filteredFuel
         .filter(f => f.vehicle_id === v.id)
         .reduce((s, f) => s + Number(f.total_amount), 0),
     }))
@@ -84,8 +97,8 @@ const CostReports = () => {
     d.setMonth(d.getMonth() - (5 - i));
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const gider =
-      fuelLogs.filter(f => (f.created_at || '').startsWith(key)).reduce((s, f) => s + Number(f.total_amount), 0) +
-      invoices.filter(inv => (inv.date || '').startsWith(key)).reduce((s, inv) => s + Number(inv.total_amount), 0);
+      filteredFuel.filter(f => (f.created_at || '').startsWith(key)).reduce((s, f) => s + Number(f.total_amount), 0) +
+      filteredInvoices.filter(inv => (inv.date || '').startsWith(key)).reduce((s, inv) => s + Number(inv.total_amount), 0);
     return { name: monthNames[d.getMonth()], gider };
   });
 
@@ -97,14 +110,21 @@ const CostReports = () => {
 
   return (
     <div>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem' }}>Maliyet Raporları</h1>
           <p className="text-muted">Tesis, araç ve personel bazlı operasyonel maliyetlerinizi analiz edin.</p>
         </div>
-        <button className="btn btn-primary" onClick={exportCSV}>
-          <BarChart3 size={18} /> Dışa Aktar
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <select className="input" style={{ minWidth: '180px', fontSize: '0.85rem' }}
+            value={selectedFacility} onChange={e => setSelectedFacility(e.target.value)}>
+            <option value="">Tüm Tesisler</option>
+            {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+          <button className="btn btn-primary" onClick={exportCSV}>
+            <BarChart3 size={18} /> Dışa Aktar
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-4" style={{ marginBottom: '2rem' }}>

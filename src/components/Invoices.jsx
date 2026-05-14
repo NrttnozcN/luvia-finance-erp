@@ -22,6 +22,7 @@ const Invoices = ({ initialView = 'list' }) => {
   const [customers, setCustomers] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [facilities, setFacilities] = useState([]);
   const [itemErrors, setItemErrors] = useState([]);
   const [detailInvoice, setDetailInvoice] = useState(null);
   const [detailItems, setDetailItems] = useState([]);
@@ -30,6 +31,7 @@ const Invoices = ({ initialView = 'list' }) => {
   // Filtre State'leri
   const [filters, setFilters] = useState({
     customer_id: '',
+    facility_id: '',
     startDate: '',
     endDate: '',
     type: ''
@@ -49,20 +51,23 @@ const Invoices = ({ initialView = 'list' }) => {
     setLoading(true);
     let query = supabase.from('invoices').select('*, customers(name)').eq('company_id', cid).order('date', { ascending: false });
 
-    if (filters.customer_id) query = query.eq('customer_id', filters.customer_id);
-    if (filters.startDate)   query = query.gte('date', filters.startDate);
-    if (filters.endDate)     query = query.lte('date', filters.endDate);
-    if (filters.type)        query = query.eq('islem_turu', filters.type);
+    if (filters.customer_id)  query = query.eq('customer_id', filters.customer_id);
+    if (filters.facility_id)  query = query.eq('facility_id', filters.facility_id);
+    if (filters.startDate)    query = query.gte('date', filters.startDate);
+    if (filters.endDate)      query = query.lte('date', filters.endDate);
+    if (filters.type)         query = query.eq('islem_turu', filters.type);
 
     const { data: invs } = await query;
     const { data: custs } = await supabase.from('customers').select('*').eq('company_id', cid).order('name');
     const { data: mats } = await supabase.from('materials').select('*').eq('company_id', cid).order('name');
     const { data: vehs } = await supabase.from('vehicles').select('*').eq('company_id', cid).order('plate');
-    
+    const { data: facs } = await supabase.from('facilities').select('id, name').eq('company_id', cid).order('name');
+
     setInvoices(invs || []);
     setCustomers(custs || []);
     setMaterials(mats || []);
     setVehicles(vehs || []);
+    setFacilities(facs || []);
     setLoading(false);
   };
 
@@ -74,6 +79,7 @@ const Invoices = ({ initialView = 'list' }) => {
     setNewInvoice({
       invoice_no: '',
       customer_id: '',
+      facility_id: '',
       date: new Date().toISOString().split('T')[0],
       description: '',
       islem_turu: 'Satış Faturası',
@@ -121,8 +127,8 @@ const Invoices = ({ initialView = 'list' }) => {
   };
 
   const handleSaveInvoice = async () => {
-    if (!newInvoice.customer_id || !newInvoice.invoice_no) {
-      alert('Lütfen fatura no ve cari bilgisini doldurun.');
+    if (!newInvoice.customer_id || !newInvoice.invoice_no || !newInvoice.facility_id) {
+      alert('Lütfen fatura no, cari ve tesis bilgisini doldurun.');
       return;
     }
 
@@ -164,6 +170,7 @@ const Invoices = ({ initialView = 'list' }) => {
       .insert([{
         invoice_no: newInvoice.invoice_no,
         customer_id: newInvoice.customer_id,
+        facility_id: newInvoice.facility_id,
         date: newInvoice.date,
         total_amount: total,
         description: newInvoice.description,
@@ -197,7 +204,7 @@ const Invoices = ({ initialView = 'list' }) => {
     else {
       setView('list');
       fetchData();
-      setNewInvoice({ invoice_no: '', customer_id: '', date: new Date().toISOString().split('T')[0], description: '', islem_turu: 'Satış Faturası', fatura_tipi: 'Ticari', items: [] });
+      setNewInvoice({ invoice_no: '', customer_id: '', facility_id: '', date: new Date().toISOString().split('T')[0], description: '', islem_turu: 'Satış Faturası', fatura_tipi: 'Ticari', items: [] });
     }
   };
 
@@ -236,6 +243,7 @@ const Invoices = ({ initialView = 'list' }) => {
             {[
               { label: 'Fatura No',    value: inv.invoice_no },
               { label: 'Cari / Ünvan', value: inv.customers?.name || '—' },
+              { label: 'Tesis',        value: facilities.find(f => f.id === inv.facility_id)?.name || '—' },
               { label: 'Tarih',        value: inv.date ? new Date(inv.date).toLocaleDateString('tr-TR') : '—' },
               { label: 'Fatura Tipi',  value: inv.fatura_tipi || '—' },
             ].map(f => (
@@ -381,12 +389,20 @@ const Invoices = ({ initialView = 'list' }) => {
             <InputGroup label="Fatura Tarihi" type="date" value={newInvoice.date} onChange={(e) => setNewInvoice({...newInvoice, date: e.target.value})} />
           </div>
 
-          <div className="grid grid-cols-2" style={{ gap: '1.5rem' }}>
+          <div className="grid grid-cols-3" style={{ gap: '1.5rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label className="label-sm">Cari (Tedarikçi / Müşteri) *</label>
               <select className="input" value={newInvoice.customer_id} onChange={(e) => setNewInvoice({...newInvoice, customer_id: e.target.value})}>
                 <option value="">— Cari Seçiniz —</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label className="label-sm">Tesis *</label>
+              <select className="input" value={newInvoice.facility_id} onChange={(e) => setNewInvoice({...newInvoice, facility_id: e.target.value})}
+                style={!newInvoice.facility_id ? { borderColor: 'var(--border)' } : {}}>
+                <option value="">— Tesis Seçiniz —</option>
+                {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
             </div>
             <InputGroup label="Açıklama / Not" placeholder="Opsiyonel not ekleyin..." value={newInvoice.description} onChange={(e) => setNewInvoice({...newInvoice, description: e.target.value})} />
@@ -580,12 +596,19 @@ const Invoices = ({ initialView = 'list' }) => {
 
       {/* Filtre Paneli */}
       <div className="card" style={{ marginBottom: '1.5rem', background: 'var(--bg-main)', border: '1.5px solid var(--border)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', alignItems: 'flex-end' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '1rem', alignItems: 'flex-end' }}>
           <div>
             <label className="label-sm" style={{ marginBottom: '0.4rem', display: 'block' }}>Cari Seçimi</label>
             <select className="input" style={{ fontSize: '0.82rem' }} value={filters.customer_id} onChange={e => setFilters({...filters, customer_id: e.target.value})}>
               <option value="">Tüm Cariler</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label-sm" style={{ marginBottom: '0.4rem', display: 'block' }}>Tesis</label>
+            <select className="input" style={{ fontSize: '0.82rem' }} value={filters.facility_id} onChange={e => setFilters({...filters, facility_id: e.target.value})}>
+              <option value="">Tüm Tesisler</option>
+              {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </div>
           <div>
@@ -605,7 +628,7 @@ const Invoices = ({ initialView = 'list' }) => {
             </select>
           </div>
           <button className="btn btn-ghost" style={{ padding: '0.65rem', fontSize: '0.78rem', color: 'var(--danger)' }} 
-            onClick={() => setFilters({ customer_id: '', startDate: '', endDate: '', type: '' })}>
+            onClick={() => setFilters({ customer_id: '', facility_id: '', startDate: '', endDate: '', type: '' })}>
             ❌ Filtreleri Temizle
           </button>
         </div>

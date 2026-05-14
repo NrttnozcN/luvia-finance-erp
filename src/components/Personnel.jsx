@@ -43,6 +43,19 @@ const calcIncomeTax = (base) => {
   return Math.round(tax * 100) / 100;
 };
 
+const calcBordroFromNet = (targetNet) => {
+  const tn = Number(targetNet) || 0;
+  if (tn <= 0) return calcBordro(0);
+  let lo = tn, hi = tn * 2.5;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    const r = calcBordro(mid);
+    if (r.net >= tn) hi = mid; else lo = mid;
+    if (hi - lo < 0.001) break;
+  }
+  return calcBordro((lo + hi) / 2);
+};
+
 const calcBordro = (gross) => {
   const g    = Number(gross) || 0;
   const sgkW = Math.round(g * SGK_WORKER * 100) / 100;
@@ -190,7 +203,7 @@ const DefinitionTab = ({ cid }) => {
   };
 
   const handleExport = () => {
-    const csv = '﻿Ad Soyad,TC Kimlik,Telefon,Görev,Departman,Tesis,İşe Giriş,Maaş,Durum\n'
+    const csv = '﻿Ad Soyad,TC Kimlik,Telefon,Görev,Departman,Tesis,İşe Giriş,Net Maaş,Durum\n'
       + filtered.map(e => [`"${e.full_name||''}"`,`"${e.tc_kimlik||''}"`,`"${e.phone||''}"`,`"${e.job_title||''}"`,`"${e.department||''}"`,`"${facilities.find(f => f.id === e.facility_id)?.name||''}"`, e.hire_date||'', e.salary||'', e.status||''].join(',')).join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     Object.assign(document.createElement('a'), { href: url, download: 'personel.csv' }).click();
@@ -232,7 +245,7 @@ const DefinitionTab = ({ cid }) => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--bg-main)' }}>
-                {['Ad Soyad', 'Görev / Departman', 'Tesis', 'İşe Giriş', 'Maaş', 'Durum', ''].map(h => (
+                {['Ad Soyad', 'Görev / Departman', 'Tesis', 'İşe Giriş', 'Net Maaş', 'Durum', ''].map(h => (
                   <th key={h} style={{ padding: '1rem 1.25rem', textAlign: 'left', fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{h}</th>
                 ))}
               </tr>
@@ -296,7 +309,7 @@ const DefinitionTab = ({ cid }) => {
                 </select>
               </div>
               <div><label className="form-label">İşe Giriş Tarihi</label><input className="input" type="date" value={form.hire_date} onChange={e => setForm(f => ({ ...f, hire_date: e.target.value }))} /></div>
-              <div><label className="form-label">Maaş (₺)</label><input className="input" type="number" value={form.salary} onChange={e => setForm(f => ({ ...f, salary: e.target.value }))} /></div>
+              <div><label className="form-label">Net Maaş (₺)</label><input className="input" type="number" value={form.salary} onChange={e => setForm(f => ({ ...f, salary: e.target.value }))} /></div>
               <div>
                 <label className="form-label">Tesis / Şube</label>
                 <select className="input" value={form.facility_id} onChange={e => setForm(f => ({ ...f, facility_id: e.target.value }))}>
@@ -499,7 +512,7 @@ const DeductionsTab = ({ employee }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem' }}>
-        <MiniCard label="Brüt Maaş"             value={`₺${Number(employee.salary || 0).toLocaleString('tr-TR')}`} color="#0284c7" />
+        <MiniCard label="Net Maaş"               value={`₺${Number(employee.salary || 0).toLocaleString('tr-TR')}`} color="#0284c7" />
         <MiniCard label="Toplam Kesinti & Avans" value={`-₺${(totalDeductions + totalAdvances).toLocaleString('tr-TR')}`} color="#dc2626" />
         <MiniCard label="Net Ödenecek"           value={`₺${netSalary.toLocaleString('tr-TR')}`} color="#16a34a" />
       </div>
@@ -594,7 +607,7 @@ const BordroTab = ({ cid }) => {
   }, [cid]);
 
   const person = employees.find(e => e.id === selected);
-  const calc   = person ? calcBordro(person.salary) : null;
+  const calc   = person ? calcBordroFromNet(person.salary) : null;
 
   const fetchHistory = useCallback(async () => {
     if (!selected) return;
@@ -676,7 +689,8 @@ const BordroTab = ({ cid }) => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
             <div className="card">
               <p style={{ fontWeight: '800', fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '1.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>İşçi — {person.full_name}</p>
-              <BRow label="Brüt Maaş"                                           value={`₺${fmt(calc.gross)}`}        bold />
+              <BRow label="Kayıtlı Net Maaş"                                    value={`₺${fmt(person.salary)}`}     muted />
+              <BRow label="Hesaplanan Brüt Maaş"                                value={`₺${fmt(calc.gross)}`}        bold />
               <BRow label={`(-) SGK İşçi (%${(SGK_WORKER*100).toFixed(0)})`}    value={`-₺${fmt(calc.sgkW)}`}       neg />
               <BRow label={`(-) İşsizlik İşçi (%${(UNEMPLOYMENT_WORKER*100).toFixed(0)})`} value={`-₺${fmt(calc.unemW)}`} neg />
               <BRow label="Gelir Vergisi Matrahı"                               value={`₺${fmt(calc.taxBase)}`}      muted />
@@ -896,7 +910,7 @@ const AvansTab = ({ cid }) => {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
             <MiniCard label="Toplam Avans" value={`₺${totalAdvance.toLocaleString('tr-TR')}`} color="#dc2626" />
-            <MiniCard label="Brüt Maaş" value={`₺${Number(person?.salary||0).toLocaleString('tr-TR')}`} color="#0284c7" />
+            <MiniCard label="Net Maaş" value={`₺${Number(person?.salary||0).toLocaleString('tr-TR')}`} color="#0284c7" />
             <MiniCard label="Kayıt Sayısı" value={`${advances.length} kayıt`} color="#7c3aed" />
           </div>
           <div className="card" style={{ background: 'var(--bg-main)', marginBottom: '1.5rem' }}>
