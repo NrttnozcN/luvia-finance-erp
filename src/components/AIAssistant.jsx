@@ -50,40 +50,53 @@ const AIAssistant = () => {
     if (!companyId) return { error: "Oturum açık değil." };
     
     const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
-    const endDate   = new Date(year, month, 0).toISOString().split('T')[0]; // Ayın son günü
+    const endDate   = new Date(year, month, 0).toISOString().split('T')[0];
 
-    const { data, error } = await supabase
-      .from('finance_transactions')
-      .select('type, category, amount, date, description')
-      .eq('company_id', companyId)
-      .gte('date', startDate)
-      .lte('date', endDate);
+    // Paralel sorgulama
+    const [finRes, fuelRes] = await Promise.all([
+      supabase.from('finance_transactions').select('*').eq('company_id', companyId).gte('date', startDate).lte('date', endDate),
+      supabase.from('fuel_logs').select('*').eq('company_id', companyId).gte('created_at', `${startDate}T00:00:00`).lte('created_at', `${endDate}T23:59:59`)
+    ]);
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return { error: `Veri çekilirken hata: ${error.message}` };
+    if (finRes.error) return { error: `Finans hatası: ${finRes.error.message}` };
+    if (fuelRes.error) return { error: `Akaryakıt hatası: ${fuelRes.error.message}` };
+
+    const finData = finRes.data || [];
+    const fuelData = fuelRes.data || [];
+
+    if (finData.length === 0 && fuelData.length === 0) {
+      return { message: `${month}/${year} dönemine ait herhangi bir kayıt bulunamadı.` };
     }
 
-    if (!data || data.length === 0) {
-      return { message: `${month}/${year} dönemine ait gelir/gider hareketi bulunamadı.` };
-    }
+    // Gruplama ve Hesaplama
+    const giderler = finData.filter(t => t.type?.includes('Gider') || t.type === 'Ödeme');
+    const gelirler = finData.filter(t => t.type?.includes('Gelir') || t.type === 'Tahsilat');
+    
+    // Akaryakıtı giderlere ekle
+    const fuelTotal = fuelData.reduce((s, l) => s + Number(l.total_amount || 0), 0);
+    const fuelLitres = fuelData.reduce((s, l) => s + Number(l.litres || 0), 0);
 
-    // Gider ve geliri ayır, kategoriye göre grupla
-    const giderler = data.filter(t => t.type?.includes('Gider') || t.type === 'Ödeme');
-    const gelirler = data.filter(t => t.type?.includes('Gelir') || t.type === 'Tahsilat');
-
-    const grupla = (list) => list.reduce((acc, curr) => {
+    const categories = giderler.reduce((acc, curr) => {
       const cat = curr.category || 'Genel';
       acc[cat] = (acc[cat] || 0) + Number(curr.amount || 0);
       return acc;
     }, {});
 
+    if (fuelTotal > 0) {
+      categories['Akaryakıt'] = (categories['Akaryakıt'] || 0) + fuelTotal;
+    }
+
     return {
       donem: `${month}/${year}`,
-      toplam_gider: giderler.reduce((s,t) => s + Number(t.amount||0), 0),
+      toplam_gider: giderler.reduce((s,t) => s + Number(t.amount||0), 0) + fuelTotal,
       toplam_gelir: gelirler.reduce((s,t) => s + Number(t.amount||0), 0),
-      gider_kategorileri: Object.entries(grupla(giderler)).map(([k,v]) => ({ kategori: k, toplam: v })),
-      gelir_kategorileri: Object.entries(grupla(gelirler)).map(([k,v]) => ({ kategori: k, toplam: v })),
+      akaryakit_detay: fuelTotal > 0 ? { tutar: fuelTotal, litre: fuelLitres, kayit_sayisi: fuelData.length } : null,
+      gider_dagilimi: Object.entries(categories).map(([k,v]) => ({ kategori: k, toplam: v })),
+      gelir_dagilimi: Object.entries(gelirler.reduce((acc, curr) => {
+        const cat = curr.category || 'Genel';
+        acc[cat] = (acc[cat] || 0) + Number(curr.amount || 0);
+        return acc;
+      }, {})).map(([k,v]) => ({ kategori: k, toplam: v })),
     };
   };
 
