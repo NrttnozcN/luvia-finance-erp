@@ -34,7 +34,7 @@ import {
 import {
   Bell, Search, Plus, DollarSign, Truck, Fuel as FuelIcon,
   PieChart, Users, AlertCircle, Clock, ChevronRight,
-  TrendingUp, ArrowUpRight, ArrowDownRight,
+  TrendingUp, ArrowUpRight, ArrowDownRight, Menu,
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
@@ -52,6 +52,7 @@ const getInitials = (name) => {
 
 const App = () => {
   const [activeModule, setActiveModule] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const currentUser = useAuthStore(s => s.currentUser);
   const cid = currentUser?.company_id;
   const [searchQuery, setSearchQuery] = useState('');
@@ -135,7 +136,7 @@ const App = () => {
     const [{ data: insps }, { data: insurs }, { data: empDocs }, { data: stockMovsRaw }] = await Promise.all([
       ...vQuery,
       supabase.from('employee_documents').select('id, doc_type, file_name, expiry_date, employees(full_name)').eq('company_id', cid).not('expiry_date', 'is', null).lte('expiry_date', future30).order('expiry_date').limit(10),
-      supabase.from('stock_movements').select('material_id, quantity, movement_type, materials(id, name, category, min_stock_level)').eq('company_id', cid),
+      supabase.from('stock_movements').select('material_id, quantity, type, materials(id, name, category, min_stock_level)').eq('company_id', cid),
     ]);
 
     const stockMap = {};
@@ -150,7 +151,7 @@ const App = () => {
         };
       }
       const q = Number(mov.quantity || 0);
-      if (mov.movement_type === 'Giriş') stockMap[mid].qty += q;
+      if (mov.type === 'Giriş') stockMap[mid].qty += q;
       else stockMap[mid].qty -= q;
     });
     const criticalStockAlerts = Object.entries(stockMap)
@@ -311,7 +312,7 @@ const App = () => {
         </div>
 
         {/* Charts Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <div className="resp-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
           {/* Area Chart */}
           <div style={cardStyle()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -385,7 +386,7 @@ const App = () => {
         </div>
 
         {/* Bottom Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '1.5rem' }}>
+        <div className="resp-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '1.5rem' }}>
           {/* Left: Son İşlemler + Uyarılar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {/* Son İşlemler */}
@@ -524,9 +525,13 @@ const App = () => {
 
   return (
     <div className="app-container">
-      <Sidebar activeTab={activeModule} setActiveTab={setActiveModule} />
+      <div className={`sidebar-overlay${sidebarOpen ? ' sidebar-open' : ''}`} onClick={() => setSidebarOpen(false)} />
+      <Sidebar activeTab={activeModule} setActiveTab={setActiveModule} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className="main-content">
         <header className="top-bar">
+          <button className="hamburger-btn" onClick={() => setSidebarOpen(s => !s)} aria-label="Menüyü aç">
+            <Menu size={20} />
+          </button>
           <div style={{ position: 'relative' }}>
             <div className="search-box">
               <Search size={18} className="text-dim" />

@@ -75,7 +75,7 @@ const getInitials = (name) => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
-const Sidebar = ({ activeTab, setActiveTab }) => {
+const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
   const currentUser = useAuthStore(s => s.currentUser);
   const logout = useAuthStore(s => s.logout);
   const canAccess = useAuthStore(s => s.canAccess);
@@ -109,7 +109,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
   }, [currentUser]);
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`}>
       {/* Logo */}
       <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem', paddingLeft: '0.5rem' }}>
         <div style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg, #FF6B00, #e55a00)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(255, 107, 0, 0.3)', flexShrink: 0 }}>
@@ -144,7 +144,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
                   icon={item.icon}
                   label={item.label}
                   active={activeTab === item.tab}
-                  onClick={() => setActiveTab(item.tab)}
+                  onClick={() => { setActiveTab(item.tab); onClose?.(); }}
                   badge={item.tab === 'support_tickets' && openTickets > 0 ? openTickets : null}
                 />
               ))}
@@ -160,7 +160,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
               icon={<Building2 size={18} />}
               label="Müşteri Firmalar"
               active={activeTab === 'companies'}
-              onClick={() => setActiveTab('companies')}
+              onClick={() => { setActiveTab('companies'); onClose?.(); }}
             />
           </div>
         )}

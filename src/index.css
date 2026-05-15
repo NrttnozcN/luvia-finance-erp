@@ -397,3 +397,109 @@ tr:hover td {
   color: inherit !important;
 }
 
+/* ─── Hamburger Button — hidden on desktop ─────────────────────────────────── */
+.hamburger-btn {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.hamburger-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+/* ─── Sidebar Overlay ───────────────────────────────────────────────────────── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.52);
+  z-index: 999;
+  backdrop-filter: blur(2px);
+}
+.sidebar-overlay.sidebar-open {
+  display: block;
+  animation: overlayFadeIn 0.25s ease;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─── RESPONSIVE — Tablet & Mobile (≤ 768px) ───────────────────────────────── */
+@media (max-width: 768px) {
+
+  /* Show hamburger */
+  .hamburger-btn { display: flex; }
+
+  /* Sidebar: slide-in drawer */
+  .sidebar {
+    position: fixed;
+    left: -300px;
+    top: 0;
+    height: 100vh;
+    width: 280px;
+    z-index: 1000;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+  }
+  .sidebar.sidebar-open {
+    left: 0;
+    box-shadow: 8px 0 40px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Layout */
+  .app-container { display: block; }
+  .main-content  { padding: 1rem; margin: 0; max-width: 100%; width: 100%; }
+
+  /* Responsive grids */
+  .grid-cols-2 { grid-template-columns: 1fr; }
+  .grid-cols-3 { grid-template-columns: repeat(2, 1fr); }
+  .grid-cols-4 { grid-template-columns: repeat(2, 1fr); }
+
+  /* Inline-styled 2-column grids (Dashboard, Stock) */
+  .resp-grid-2col { grid-template-columns: 1fr !important; }
+
+  /* Top bar */
+  .top-bar    { margin-bottom: 1.25rem; gap: 0.5rem; }
+  .search-box { max-width: 100%; flex: 1; min-width: 0; }
+  .user-nav   { gap: 0.5rem; }
+
+  /* Buttons — touch friendly (44px minimum) */
+  .btn { min-height: 44px; }
+
+  /* Tables — horizontal scroll inside cards */
+  .card    { overflow-x: auto; }
+  table    { min-width: 520px; }
+  td, th   { padding: 0.9rem 0.85rem; }
+
+  /* Stat card values */
+  .stat-value { font-size: 1.4rem; }
+  .stat-icon  { width: 34px; height: 34px; }
+
+  /* Print: never relevant on mobile */
+}
+
+/* ─── RESPONSIVE — Small phones (≤ 480px) ──────────────────────────────────── */
+@media (max-width: 480px) {
+  .main-content { padding: 0.75rem; }
+
+  .card { padding: 1rem; }
+
+  /* Single column on small phones */
+  .grid-cols-3,
+  .grid-cols-4 { grid-template-columns: 1fr; }
+
+  .top-bar { gap: 0.4rem; flex-wrap: nowrap; }
+
+  /* Slightly smaller DashStatCard values */
+  .dash-stat-card h3 { font-size: 1.3rem !important; }
+}
+
