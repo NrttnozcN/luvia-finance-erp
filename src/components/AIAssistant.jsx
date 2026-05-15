@@ -92,7 +92,7 @@ const AIAssistant = () => {
 
     try {
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash",
         tools: [toolsDeclaration],
         systemInstruction: "Sen Luvia ERP'nin resmi finansal asistanısın. Kullanıcıya kibar ve profesyonel Türkçe cevap ver. Sana sağlanan araçları kullanarak veritabanından veri çek ve bunları markdown formatında okunaklı tablolarla sun. Bugünün tarihi: " + new Date().toLocaleDateString('tr-TR'),
       });
