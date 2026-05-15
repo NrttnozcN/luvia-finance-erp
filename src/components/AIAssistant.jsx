@@ -94,28 +94,34 @@ const AIAssistant = () => {
       const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash",
         tools: [toolsDeclaration],
-        systemInstruction: "Sen Luvia ERP'nin resmi finansal asistanısın. Kullanıcıya kibar ve profesyonel cevap ver. Sana sağlanan araçları kullanarak veritabanından veri çek ve bunları markdown formatında okunaklı tablolarla sun.",
+        systemInstruction: "Sen Luvia ERP'nin resmi finansal asistanısın. Kullanıcıya kibar ve profesyonel Türkçe cevap ver. Sana sağlanan araçları kullanarak veritabanından veri çek ve bunları markdown formatında okunaklı tablolarla sun. Bugünün tarihi: " + new Date().toLocaleDateString('tr-TR'),
       });
 
       const chat = model.startChat();
       let result = await chat.sendMessage(userMessage);
       let response = result.response;
 
-      if (response.functionCalls && response.functionCalls.length > 0) {
-        const call = response.functionCalls[0];
+      // Gemini function calling - farklı API versiyonlarıyla uyumlu erişim
+      const calls = response.functionCalls?.() ?? response.functionCalls ?? [];
+
+      if (calls && calls.length > 0) {
+        const call = calls[0];
         if (toolsFunctions[call.name]) {
           const apiResponse = await toolsFunctions[call.name](call.args);
           result = await chat.sendMessage([{
-            functionResponse: { name: call.name, response: apiResponse }
+            functionResponse: { name: call.name, response: { result: apiResponse } }
           }]);
           response = result.response;
         }
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: response.text() }]);
+      const text = typeof response.text === 'function' ? response.text() : response.text;
+      setMessages(prev => [...prev, { role: 'assistant', content: text || 'Yanıt alınamadı.' }]);
     } catch (error) {
       console.error('AI Error:', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Üzgünüm, şu anda yanıt veremiyorum.' }]);
+      // Hata mesajını kullanıcıya göster (geliştirme aşaması için)
+      const errMsg = error?.message || JSON.stringify(error);
+      setMessages(prev => [...prev, { role: 'assistant', content: `Bir hata oluştu: ${errMsg}` }]);
     } finally {
       setIsLoading(false);
     }
