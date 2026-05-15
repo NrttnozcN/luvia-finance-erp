@@ -132,15 +132,43 @@ const App = () => {
         ]
       : [Promise.resolve({ data: [] }), Promise.resolve({ data: [] })];
 
-    const [{ data: insps }, { data: insurs }, { data: empDocs }] = await Promise.all([
+    const [{ data: insps }, { data: insurs }, { data: empDocs }, { data: stockMovsRaw }] = await Promise.all([
       ...vQuery,
       supabase.from('employee_documents').select('id, doc_type, file_name, expiry_date, employees(full_name)').eq('company_id', cid).not('expiry_date', 'is', null).lte('expiry_date', future30).order('expiry_date').limit(10),
+      supabase.from('stock_movements').select('material_id, quantity, movement_type, materials(id, name, category, min_stock_level)').eq('company_id', cid),
     ]);
+
+    const stockMap = {};
+    (stockMovsRaw || []).forEach(mov => {
+      const mid = mov.material_id;
+      if (!mid) return;
+      if (!stockMap[mid]) {
+        stockMap[mid] = {
+          name: mov.materials?.name || mid,
+          minLevel: Number(mov.materials?.min_stock_level ?? 10),
+          qty: 0,
+        };
+      }
+      const q = Number(mov.quantity || 0);
+      if (mov.movement_type === 'Giriş') stockMap[mid].qty += q;
+      else stockMap[mid].qty -= q;
+    });
+    const criticalStockAlerts = Object.entries(stockMap)
+      .filter(([, v]) => v.qty <= v.minLevel)
+      .map(([mid, v]) => ({
+        id: `stock-${mid}`,
+        category: 'Stok Uyarısı',
+        label: v.name,
+        expiry: null,
+        days: v.qty <= 0 ? -1 : 3,
+        badge: `${Math.max(0, Math.round(v.qty))} adet`,
+      }));
 
     const items = [
       ...(insps || []).map(i => ({ id: `i-${i.id}`, category: 'Muayene', label: `${i.type} — ${i.vehicles?.plate || ''}`, expiry: i.expiry_date, days: daysUntil(i.expiry_date) })),
       ...(insurs || []).map(i => ({ id: `s-${i.id}`, category: 'Sigorta', label: `${i.insurance_type}${i.company ? ' (' + i.company + ')' : ''} — ${i.vehicles?.plate || ''}`, expiry: i.expiry_date, days: daysUntil(i.expiry_date) })),
       ...(empDocs || []).map(d => ({ id: `d-${d.id}`, category: 'Personel Belgesi', label: `${d.doc_type} — ${d.employees?.full_name || ''}`, expiry: d.expiry_date, days: daysUntil(d.expiry_date) })),
+      ...criticalStockAlerts,
     ].sort((a, b) => a.days - b.days);
     setUpcomingAlerts(items);
   };
@@ -402,8 +430,8 @@ const App = () => {
             <div style={cardStyle()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '2px' }}>Yaklaşan Muayene & Sigorta</h3>
-                  <p style={{ fontSize: '0.78rem', color: '#94a3b8' }}>60 gün içindeki son kullanma tarihleri</p>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '2px' }}>Yaklaşan Uyarılar</h3>
+                  <p style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Muayene, sigorta, belge & kritik stok</p>
                 </div>
                 <button className="btn btn-ghost" style={{ fontSize: '0.82rem' }} onClick={() => setActiveModule('alert-center')}>Tümünü Gör →</button>
               </div>
@@ -420,7 +448,7 @@ const App = () => {
                       <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{a.category} — {fmtDate(a.expiry)}</p>
                     </div>
                     <span style={{ fontSize: '0.76rem', fontWeight: '800', padding: '0.22rem 0.6rem', borderRadius: '20px', whiteSpace: 'nowrap', background: a.days < 0 ? 'rgba(244,63,94,0.12)' : a.days <= 7 ? 'rgba(245,158,11,0.12)' : 'rgba(99,102,241,0.1)', color: a.days < 0 ? '#F43F5E' : a.days <= 7 ? '#f59e0b' : '#6366F1' }}>
-                      {a.days < 0 ? `${Math.abs(a.days)}g geçti` : a.days === 0 ? 'Bugün!' : `${a.days}g kaldı`}
+                      {a.badge ? a.badge : (a.days < 0 ? `${Math.abs(a.days)}g geçti` : a.days === 0 ? 'Bugün!' : `${a.days}g kaldı`)}
                     </span>
                   </div>
                 ))}

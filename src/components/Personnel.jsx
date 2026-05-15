@@ -31,6 +31,16 @@ const UNEMPLOYMENT_WORKER = 0.01;
 const UNEMPLOYMENT_EMP    = 0.02;
 const STAMP_TAX_RATE      = 0.00759;
 
+const countWorkdays = (year, month) => {
+  let count = 0;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  for (let i = 1; i <= daysInMonth; i++) {
+    const day = new Date(year, month - 1, i).getDay();
+    if (day !== 0 && day !== 6) count++;
+  }
+  return count;
+};
+
 const calcIncomeTax = (base) => {
   if (base <= 0) return 0;
   const brackets = [[9167, 0.15], [10000, 0.20], [29166, 0.27], [201667, 0.35], [Infinity, 0.40]];
