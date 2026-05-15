@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
 
 // Kendi anahtarınızı buraya güvenle koyabilirsiniz, yerel kullanım içindir.
-const genAI = new GoogleGenerativeAI('AIzaSyBnpkELrZ3ZRNIP7PUzLH_h47zEZ7Nxnto');
+const genAI = new GoogleGenerativeAI('AIzaSyCOzr6Ky2-sULC0MIJk4VvDEMa-icIs5j8');
 
 const toolsDeclaration = {
   functionDeclarations: [
@@ -92,7 +92,7 @@ const AIAssistant = () => {
 
     try {
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         tools: [toolsDeclaration],
         systemInstruction: "Sen Luvia ERP'nin resmi finansal asistanısın. Kullanıcıya kibar ve profesyonel Türkçe cevap ver. Sana sağlanan araçları kullanarak veritabanından veri çek ve bunları markdown formatında okunaklı tablolarla sun. Bugünün tarihi: " + new Date().toLocaleDateString('tr-TR'),
       });
