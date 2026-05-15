@@ -26,18 +26,15 @@ import SupportTickets from './components/SupportTickets';
 import Companies from './components/Companies';
 import Login from './components/Login';
 import AIAssistant from './components/AIAssistant';
-import { 
-  Bell, 
-  Search, 
-  Plus, 
-  DollarSign, 
-  Truck, 
-  Fuel as FuelIcon, 
-  PieChart, 
-  Users,
-  AlertCircle,
-  Clock,
-  ChevronRight
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip as ReTooltip, ResponsiveContainer,
+  PieChart as RPieChart, Pie, Cell,
+} from 'recharts';
+import {
+  Bell, Search, Plus, DollarSign, Truck, Fuel as FuelIcon,
+  PieChart, Users, AlertCircle, Clock, ChevronRight,
+  TrendingUp, ArrowUpRight, ArrowDownRight,
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
@@ -69,39 +66,55 @@ const App = () => {
   });
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const unreadCount = notifications.filter(n => !n.read).length;
-  const [stats, setStats] = useState({
-    totalSales: 0,
-    vehicleCount: 0,
-    customerCount: 0,
-    fuelCost: 0,
-    pendingInvoices: 0
-  });
+  const [stats, setStats] = useState({ totalSales: 0, vehicleCount: 0, customerCount: 0, fuelCost: 0, pendingInvoices: 0 });
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [expensePie, setExpensePie] = useState([]);
+  const [recentTransactions, setRecentTransactions] = useState([]);
   const [upcomingAlerts, setUpcomingAlerts] = useState([]);
 
-  // SQL'DEN GERÇEK İSTATİSTİKLERİ ÇEK
   const fetchDashboardStats = async () => {
     if (!cid) return;
-    // 1. Toplam Satış (Faturalar)
-    const { data: invs } = await supabase.from('invoices').select('total_amount').eq('company_id', cid);
-    const totalSales = invs?.reduce((acc, curr) => acc + Number(curr.total_amount), 0) || 0;
+    const MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
-    // 2. Araç Sayısı
-    const { count: vCount } = await supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('company_id', cid);
+    const [
+      { data: invs },
+      { count: vCount },
+      { count: cCount },
+      { data: fuel },
+      { data: emps },
+      { data: recentTx },
+    ] = await Promise.all([
+      supabase.from('invoices').select('total_amount, date, islem_turu').eq('company_id', cid),
+      supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('company_id', cid),
+      supabase.from('customers').select('*', { count: 'exact', head: true }).eq('company_id', cid),
+      supabase.from('fuel_logs').select('total_amount').eq('company_id', cid),
+      supabase.from('employees').select('salary').eq('company_id', cid),
+      supabase.from('finance_transactions').select('*').eq('company_id', cid).order('date', { ascending: false }).limit(8),
+    ]);
 
-    // 3. Cari Sayısı
-    const { count: cCount } = await supabase.from('customers').select('*', { count: 'exact', head: true }).eq('company_id', cid);
+    const totalSales   = invs?.filter(i => i.islem_turu === 'Satış Faturası').reduce((s, i) => s + Number(i.total_amount), 0) || 0;
+    const fuelCost     = fuel?.reduce((s, f) => s + Number(f.total_amount), 0) || 0;
+    const persTotal    = emps?.reduce((s, e) => s + Number(e.salary || 0), 0) || 0;
+    const invGider     = invs?.filter(i => i.islem_turu === 'Alış Faturası').reduce((s, i) => s + Number(i.total_amount), 0) || 0;
 
-    // 4. Akaryakıt Maliyeti
-    const { data: fuel } = await supabase.from('fuel_logs').select('total_amount').eq('company_id', cid);
-    const fuelCost = fuel?.reduce((acc, curr) => acc + Number(curr.total_amount), 0) || 0;
-
-    setStats({
-      totalSales,
-      vehicleCount: vCount || 0,
-      customerCount: cCount || 0,
-      fuelCost,
-      pendingInvoices: invs?.length || 0
+    const monthly = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(); d.setMonth(d.getMonth() - (5 - i));
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const gelir = invs?.filter(inv => inv.islem_turu === 'Satış Faturası' && (inv.date || '').startsWith(key)).reduce((s, inv) => s + Number(inv.total_amount), 0) || 0;
+      const gider = invs?.filter(inv => inv.islem_turu === 'Alış Faturası' && (inv.date || '').startsWith(key)).reduce((s, inv) => s + Number(inv.total_amount), 0) || 0;
+      return { name: MONTHS[d.getMonth()], Gelir: Math.round(gelir), Gider: Math.round(gider) };
     });
+
+    const pie = [
+      { name: 'Akaryakıt',     value: Math.round(fuelCost),  color: '#6366F1' },
+      { name: 'Personel',      value: Math.round(persTotal),  color: '#10B981' },
+      { name: 'Fatura Gideri', value: Math.round(invGider),   color: '#F43F5E' },
+    ].filter(d => d.value > 0);
+
+    setStats({ totalSales, vehicleCount: vCount || 0, customerCount: cCount || 0, fuelCost, pendingInvoices: invs?.length || 0 });
+    setMonthlyData(monthly);
+    setExpensePie(pie);
+    setRecentTransactions(recentTx || []);
   };
 
   const fetchUpcomingAlerts = async () => {
@@ -232,100 +245,216 @@ const App = () => {
     }
   };
 
-  const renderDashboard = () => (
-    <div className="dashboard-view">
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Hoş Geldiniz, {currentUser?.name || 'Nurettin Özcan'}</h1>
-        <p className="text-muted">İşte işletmenizin bugünkü finansal ve operasyonel özeti.</p>
-      </header>
+  const renderDashboard = () => {
+    const fmt = (n) => `₺${Number(n || 0).toLocaleString('tr-TR')}`;
+    const card = (style = {}) => ({
+      background: 'white', borderRadius: '20px', padding: '1.75rem',
+      boxShadow: '0 4px 24px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9',
+      ...style,
+    });
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-4" style={{ marginBottom: '2.5rem' }}>
-        <StatCard 
-          title="Toplam Ciro" 
-          value={`₺${stats.totalSales.toLocaleString()}`} 
-          trend="+12.5%" 
-          positive={true} 
-          icon={<DollarSign size={20} />} 
-        />
-        <StatCard 
-          title="Aktif Filo" 
-          value={stats.vehicleCount} 
-          trend="Tümü aktif" 
-          positive={true} 
-          icon={<Truck size={20} />} 
-        />
-        <StatCard 
-          title="Akaryakıt Gideri" 
-          value={`₺${stats.fuelCost.toLocaleString()}`} 
-          trend="-%4.2" 
-          positive={true} 
-          icon={<FuelIcon size={20} />} 
-        />
-        <StatCard 
-          title="Cari Hesaplar" 
-          value={stats.customerCount} 
-          trend="Aktif cari" 
-          positive={true} 
-          icon={<Users size={20} />} 
-        />
-      </div>
+    return (
+      <div style={{ paddingBottom: '2rem' }}>
+        {/* Header */}
+        <header style={{ marginBottom: '1.75rem' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1E293B', marginBottom: '4px' }}>
+            Hoş Geldiniz, {currentUser?.name?.split(' ')[0] || 'Admin'} 👋
+          </h1>
+          <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>İşletmenizin finansal ve operasyonel özeti.</p>
+        </header>
 
-      <div className="grid grid-cols-3" style={{ gap: '2rem' }}>
-        {/* Recent Alerts */}
-        <div className="col-span-2">
-          <div className="card" style={{ marginBottom: '2rem' }}>
+        {/* Stat Cards */}
+        <div className="grid grid-cols-4" style={{ marginBottom: '1.75rem' }}>
+          <DashStatCard title="Toplam Ciro"      value={fmt(stats.totalSales)}    sub="Tüm satış faturaları"  icon={<TrendingUp size={20} />}  gradient="linear-gradient(135deg,#6366F1,#8B5CF6)" />
+          <DashStatCard title="Aktif Filo"        value={stats.vehicleCount}       sub="Kayıtlı araç sayısı"   icon={<Truck size={20} />}       gradient="linear-gradient(135deg,#10B981,#059669)" />
+          <DashStatCard title="Akaryakıt Gideri"  value={fmt(stats.fuelCost)}      sub="Toplam yakıt maliyeti" icon={<FuelIcon size={20} />}    gradient="linear-gradient(135deg,#F43F5E,#E11D48)" />
+          <DashStatCard title="Cari Hesaplar"     value={stats.customerCount}      sub="Aktif cari sayısı"     icon={<Users size={20} />}       gradient="linear-gradient(135deg,#1E293B,#334155)" />
+        </div>
+
+        {/* Charts Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          {/* Area Chart */}
+          <div style={card()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem' }}>Yaklaşan Muayene & Sigorta</h3>
-              <button className="btn btn-ghost" onClick={() => setActiveModule('alert-center')}>Tümünü Gör</button>
+              <div>
+                <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '2px' }}>Gelir / Gider Trendi</h3>
+                <p style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Son 6 aylık karşılaştırma</p>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.78rem', fontWeight: '700' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#6366F1' }}>
+                  <span style={{ width: '12px', height: '3px', background: '#6366F1', borderRadius: '2px', display: 'inline-block' }} /> Gelir
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#F43F5E' }}>
+                  <span style={{ width: '12px', height: '3px', background: '#F43F5E', borderRadius: '2px', display: 'inline-block' }} /> Gider
+                </span>
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {upcomingAlerts.length === 0 ? (
-                <p className="text-dim" style={{ textAlign: 'center', padding: '1.5rem', fontSize: '0.85rem' }}>Son 60 günde yaklaşan muayene veya sigorta yok.</p>
-              ) : upcomingAlerts.slice(0, 5).map(a => (
-                <AlertItem
-                  key={a.id}
-                  icon={a.days !== null && a.days < 0 ? <AlertCircle color="var(--danger)" /> : <Clock color="var(--warning)" />}
-                  title={`${a.category}: ${a.label}`}
-                  desc={a.days !== null && a.days < 0
-                    ? `${Math.abs(a.days)} gün geçti — ${fmtDate(a.expiry)}`
-                    : a.days === 0 ? `Bugün sona eriyor — ${fmtDate(a.expiry)}`
-                    : `${a.days} gün kaldı — ${fmtDate(a.expiry)}`}
-                  time={a.days !== null && a.days < 0 ? 'Süresi geçmiş!' : a.days === 0 ? 'Bugün!' : `${a.days} gün`}
-                />
-              ))}
-            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={monthlyData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gelirGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.18} />
+                    <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="giderGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.14} />
+                    <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={12} tick={{ fill: '#94a3b8' }} />
+                <YAxis axisLine={false} tickLine={false} fontSize={11} tick={{ fill: '#94a3b8' }} tickFormatter={v => `${(v / 1000).toFixed(0)}K`} />
+                <ReTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '0.83rem' }} formatter={(v, n) => [fmt(v), n]} />
+                <Area type="monotone" dataKey="Gelir" stroke="#6366F1" strokeWidth={2.5} fill="url(#gelirGrad)" dot={{ fill: '#6366F1', r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                <Area type="monotone" dataKey="Gider" stroke="#F43F5E" strokeWidth={2.5} fill="url(#giderGrad)" dot={{ fill: '#F43F5E', r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-          
-          <div className="card">
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Son İşlemler</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <p className="text-dim" style={{ textAlign: 'center', padding: '2rem' }}>Henüz son işlem bulunmuyor.</p>
+
+          {/* Pie Chart */}
+          <div style={card()}>
+            <div style={{ marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '2px' }}>Gider Dağılımı</h3>
+              <p style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Kategori bazlı maliyet analizi</p>
             </div>
+            {expensePie.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#94a3b8', fontSize: '0.85rem' }}>Veri yok</div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={170}>
+                  <RPieChart>
+                    <Pie data={expensePie} innerRadius={52} outerRadius={78} paddingAngle={4} dataKey="value" startAngle={90} endAngle={-270}>
+                      {expensePie.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <ReTooltip formatter={v => [fmt(v)]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '0.82rem' }} />
+                  </RPieChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem' }}>
+                  {expensePie.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color, display: 'inline-block', flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '600' }}>{item.name}</span>
+                      </div>
+                      <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B' }}>{fmt(item.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="col-span-1">
-          <div className="card" style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Hızlı Operasyonlar</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <DashboardAction onClick={() => setActiveModule('vehicles')} icon={<Truck size={20} />} label="Araç Seferi Başlat" description="Plaka ve şoför ataması yap" />
-              <DashboardAction onClick={() => setActiveModule('fuel')} icon={<FuelIcon size={20} />} label="Akaryakıt Fişi Ekle" description="Fişi tara veya manuel gir" />
-              <DashboardAction onClick={() => setActiveModule('invoices')} icon={<PieChart size={20} />} label="Günlük İcmal Al" description="Tesisin gün sonu raporu" />
-              <DashboardAction onClick={() => setActiveModule('customers')} icon={<Users size={20} />} label="Cari Hareket Ekle" description="Tahsilat veya ödeme kaydı" />
+        {/* Bottom Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '1.5rem' }}>
+          {/* Left: Son İşlemler + Uyarılar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Son İşlemler */}
+            <div style={card()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '2px' }}>Son İşlemler</h3>
+                  <p style={{ fontSize: '0.78rem', color: '#94a3b8' }}>En son finansal hareketler</p>
+                </div>
+                <button className="btn btn-ghost" style={{ fontSize: '0.82rem' }} onClick={() => setActiveModule('wallets')}>Tümünü Gör →</button>
+              </div>
+              {recentTransactions.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>Henüz işlem kaydı bulunmuyor.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {recentTransactions.map((tx, i) => {
+                    const isGelir = tx.type === 'Gelir' || Number(tx.amount) >= 0;
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.8rem 1rem', borderRadius: '12px', background: '#f8fafc' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}>
+                        <div style={{ width: '38px', height: '38px', borderRadius: '11px', background: isGelir ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {isGelir ? <ArrowUpRight size={17} color="#10B981" /> : <ArrowDownRight size={17} color="#F43F5E" />}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontWeight: '700', fontSize: '0.87rem', color: '#1E293B', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {tx.description || tx.type || 'İşlem'}
+                          </p>
+                          <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{tx.date ? new Date(tx.date).toLocaleDateString('tr-TR') : '—'}</p>
+                        </div>
+                        <span style={{ fontWeight: '800', fontSize: '0.93rem', color: isGelir ? '#10B981' : '#F43F5E', whiteSpace: 'nowrap' }}>
+                          {isGelir ? '+' : '-'}₺{Math.abs(Number(tx.amount || 0)).toLocaleString('tr-TR')}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Yaklaşan Uyarılar */}
+            <div style={card()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '2px' }}>Yaklaşan Muayene & Sigorta</h3>
+                  <p style={{ fontSize: '0.78rem', color: '#94a3b8' }}>60 gün içindeki son kullanma tarihleri</p>
+                </div>
+                <button className="btn btn-ghost" style={{ fontSize: '0.82rem' }} onClick={() => setActiveModule('alert-center')}>Tümünü Gör →</button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                {upcomingAlerts.length === 0 ? (
+                  <p style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>Yaklaşan muayene veya sigorta yok.</p>
+                ) : upcomingAlerts.slice(0, 4).map(a => (
+                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.8rem 1rem', borderRadius: '12px', background: a.days < 0 ? 'rgba(244,63,94,0.05)' : a.days <= 7 ? 'rgba(245,158,11,0.05)' : '#f8fafc' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '11px', background: a.days < 0 ? 'rgba(244,63,94,0.12)' : a.days <= 7 ? 'rgba(245,158,11,0.12)' : 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {a.days < 0 ? <AlertCircle size={17} color="#F43F5E" /> : <Clock size={17} color={a.days <= 7 ? '#f59e0b' : '#6366F1'} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontWeight: '700', fontSize: '0.87rem', color: '#1E293B', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.label}</p>
+                      <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{a.category} — {fmtDate(a.expiry)}</p>
+                    </div>
+                    <span style={{ fontSize: '0.76rem', fontWeight: '800', padding: '0.22rem 0.6rem', borderRadius: '20px', whiteSpace: 'nowrap', background: a.days < 0 ? 'rgba(244,63,94,0.12)' : a.days <= 7 ? 'rgba(245,158,11,0.12)' : 'rgba(99,102,241,0.1)', color: a.days < 0 ? '#F43F5E' : a.days <= 7 ? '#f59e0b' : '#6366F1' }}>
+                      {a.days < 0 ? `${Math.abs(a.days)}g geçti` : a.days === 0 ? 'Bugün!' : `${a.days}g kaldı`}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="card" style={{ background: 'var(--primary)', color: 'white' }}>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Yardım Merkezi</h3>
-            <p style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '1.5rem' }}>Sistemle ilgili bir sorun mu yaşıyorsunuz? Destek ekibimize ulaşın.</p>
-            <button className="btn" style={{ background: 'white', color: 'var(--primary)', width: '100%' }} onClick={() => setShowSupportModal(true)}>Destek Talebi Oluştur</button>
+          {/* Right: Hızlı İşlemler + Destek */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={card()}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '1.25rem' }}>Hızlı İşlemler</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {[
+                  { icon: <Truck size={17} />,     label: 'Araç Seferi Başlat', tab: 'vehicles',       color: '#6366F1', bg: 'rgba(99,102,241,0.1)' },
+                  { icon: <FuelIcon size={17} />,  label: 'Akaryakıt Fişi Ekle', tab: 'fuel',          color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+                  { icon: <DollarSign size={17} />,label: 'Yeni Fatura İşle',   tab: 'invoices-create', color: '#F43F5E', bg: 'rgba(244,63,94,0.1)' },
+                  { icon: <Users size={17} />,     label: 'Cari Hareket Ekle',  tab: 'customers',      color: '#1E293B', bg: 'rgba(30,41,59,0.08)' },
+                ].map((a, i) => (
+                  <button key={i} onClick={() => setActiveModule(a.tab)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.85rem 1rem', borderRadius: '12px', background: '#f8fafc', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%', transition: 'all 0.18s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.transform = 'translateX(3px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.transform = 'translateX(0)'; }}>
+                    <div style={{ width: '35px', height: '35px', borderRadius: '10px', background: a.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: a.color, flexShrink: 0 }}>{a.icon}</div>
+                    <span style={{ fontWeight: '700', fontSize: '0.87rem', color: '#1E293B', flex: 1 }}>{a.label}</span>
+                    <ChevronRight size={14} color="#94a3b8" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', borderRadius: '20px', padding: '1.75rem', boxShadow: '0 8px 32px rgba(99,102,241,0.28)' }}>
+              <h3 style={{ color: 'white', fontWeight: '800', fontSize: '1rem', marginBottom: '0.4rem' }}>Yardım Merkezi</h3>
+              <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.84rem', marginBottom: '1.25rem', lineHeight: '1.55' }}>Bir sorun mu yaşıyorsunuz? Destek ekibimize ulaşın.</p>
+              <button onClick={() => setShowSupportModal(true)}
+                style={{ width: '100%', padding: '0.7rem', borderRadius: '12px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', transition: 'background 0.18s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}>
+                Destek Talebi Oluştur
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const handleSupportSubmit = async () => {
     if (!supportForm.title.trim()) return;
@@ -490,13 +619,24 @@ const App = () => {
   );
 };
 
+const DashStatCard = ({ title, value, sub, icon, gradient }) => (
+  <div style={{ background: gradient, borderRadius: '20px', padding: '1.5rem', boxShadow: '0 8px 24px rgba(0,0,0,0.13)', color: 'white', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ position: 'absolute', top: '-18px', right: '-18px', width: '90px', height: '90px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
+    <div style={{ position: 'absolute', bottom: '-25px', right: '18px', width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
+    <div style={{ position: 'relative' }}>
+      <div style={{ padding: '0.5rem', borderRadius: '11px', background: 'rgba(255,255,255,0.2)', display: 'inline-flex', marginBottom: '1rem' }}>{icon}</div>
+      <h3 style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '0.15rem', letterSpacing: '-0.02em' }}>{value}</h3>
+      <p style={{ fontSize: '0.88rem', fontWeight: '700', opacity: 0.9, marginBottom: '2px' }}>{title}</p>
+      <p style={{ fontSize: '0.74rem', opacity: 0.65 }}>{sub}</p>
+    </div>
+  </div>
+);
+
 const StatCard = ({ title, value, trend, positive, icon }) => (
   <div className="card stat-card">
     <div className="stat-header">
       <div className="stat-icon">{icon}</div>
-      <span className={`stat-trend ${positive ? 'up' : 'down'}`}>
-        {trend}
-      </span>
+      <span className={`stat-trend ${positive ? 'up' : 'down'}`}>{trend}</span>
     </div>
     <div className="stat-body">
       <h3 className="stat-value">{value}</h3>
