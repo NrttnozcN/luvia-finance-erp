@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Bot, User } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, User, Maximize2, Minimize2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { supabase } from '../lib/supabase';
@@ -28,6 +28,7 @@ const toolsDeclaration = {
 
 const AIAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'Merhaba! Luvia Finansal Asistanı emrinizde. Size nasıl yardımcı olabilirim?' }
   ]);
@@ -181,19 +182,20 @@ const AIAssistant = () => {
       {isOpen && (
         <div style={{
           position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          width: '380px',
-          height: '600px',
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '24px',
-          boxShadow: '0 12px 48px rgba(0, 0, 0, 0.15)',
+          bottom: isMaximized ? '0' : '24px',
+          right: isMaximized ? '0' : '24px',
+          width: isMaximized ? '100%' : '380px',
+          height: isMaximized ? '100%' : '600px',
+          background: 'rgba(255, 255, 255, 0.98)',
+          backdropFilter: 'blur(15px)',
+          borderRadius: isMaximized ? '0' : '24px',
+          boxShadow: '0 12px 48px rgba(0, 0, 0, 0.2)',
           display: 'flex',
           flexDirection: 'column',
           zIndex: 10000,
-          border: '1px solid rgba(255,255,255,0.4)',
-          overflow: 'hidden'
+          border: isMaximized ? 'none' : '1px solid rgba(255,255,255,0.4)',
+          overflow: 'hidden',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}>
           {/* Header */}
           <div style={{
@@ -213,7 +215,20 @@ const AIAssistant = () => {
                 <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>Online</span>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', opacity: 0.8 }}><X size={24} /></button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button 
+                onClick={() => setIsMaximized(!isMaximized)} 
+                style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', opacity: 0.8, display: 'flex', alignItems: 'center' }}
+              >
+                {isMaximized ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+              </button>
+              <button 
+                onClick={() => { setIsOpen(false); setIsMaximized(false); }} 
+                style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', opacity: 0.8, display: 'flex', alignItems: 'center' }}
+              >
+                <X size={24} />
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
