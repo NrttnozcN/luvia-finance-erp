@@ -25,6 +25,7 @@ import KasaHareketRaporu from './components/KasaHareketRaporu';
 import SupportTickets from './components/SupportTickets';
 import Companies from './components/Companies';
 import Login from './components/Login';
+import AIAssistant from './components/AIAssistant';
 import { 
   Bell, 
   Search, 
@@ -484,6 +485,7 @@ const App = () => {
           </div>
         </div>
       )}
+      <AIAssistant />
     </div>
   );
 };

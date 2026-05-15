@@ -45,6 +45,8 @@ const LEGACY_PERMISSIONS = {
   Izleme:    ['dashboard', 'costs', 'sales', 'alerts'],
 };
 
+import { localApi } from '../lib/localApi';
+
 const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -52,74 +54,41 @@ const useAuthStore = create(
       loginError: null,
 
       login: async (identifier, password) => {
-        const cleanId = identifier.trim().toLowerCase();
-
-        // 1) Kullanıcıyı şifre ile bul (companies join, roles ayrı sorgu)
-        const { data: users, error } = await supabase
-          .from('profiles')
-          .select('*, companies(*)')
-          .eq('password', password);
-
-        if (error || !users || users.length === 0) {
-          set({ loginError: 'Kullanıcı adı/e-posta veya şifre hatalı.' });
-          return false;
-        }
-
-        const user = users.find(u =>
-          (u.email && u.email.toLowerCase() === cleanId) ||
-          (u.username && u.username.toLowerCase() === cleanId)
-        );
-
-        if (!user) {
-          set({ loginError: 'Kullanıcı adı/e-posta veya şifre hatalı.' });
-          return false;
-        }
-
-        if (user.companies) {
-          if (user.companies.status === 'passive') {
-            set({ loginError: 'Firmanızın hesabı askıya alınmıştır. Lütfen Ülgen Soft ile iletişime geçin.' });
+        try {
+          const { data, error } = await localApi.auth.signIn(identifier, password);
+          
+          if (error) {
+            set({ loginError: error.error || 'Giriş yapılamadı.' });
             return false;
           }
-          if (user.companies.license_end_date) {
-            const expiry = new Date(user.companies.license_end_date);
-            expiry.setHours(23, 59, 59, 999);
-            if (expiry < new Date()) {
-              set({ loginError: 'Lisans süreniz dolmuştur. Lütfen Ülgen Soft Yazılım ile iletişime geçin.' });
-              return false;
-            }
-          }
+
+          const user = data.user;
+          const safeUser = {
+            id:          user.id,
+            name:        user.full_name,
+            username:    user.username,
+            email:       user.email,
+            role:        user.role,
+            role_id:     user.role_id || null,
+            roleLabel:   ROLE_DISPLAY_META[user.role]?.label || user.role,
+            permissions: user.permissions || null,
+            company_id:  user.company_id || null,
+            companyName: user.companyName || null,
+            status:      'active',
+          };
+
+          set({ currentUser: safeUser, loginError: null });
+          return true;
+        } catch (err) {
+          set({ loginError: 'Sunucuyla bağlantı kurulamadı.' });
+          return false;
         }
-
-        // 2) role_id varsa roles tablosundan ayrıca çek (FK yoksa hata vermez)
-        let roleInfo = null;
-        if (user.role_id) {
-          const { data: rd } = await supabase
-            .from('roles')
-            .select('name, permissions')
-            .eq('id', user.role_id)
-            .single();
-          roleInfo = rd || null;
-        }
-
-        const safeUser = {
-          id:          user.id,
-          name:        user.full_name,
-          username:    user.username,
-          email:       user.email,
-          role:        user.role,
-          role_id:     user.role_id || null,
-          roleLabel:   roleInfo?.name || ROLE_DISPLAY_META[user.role]?.label || user.role,
-          permissions: roleInfo?.permissions || null,
-          company_id:  user.company_id || null,
-          companyName: user.companies?.name || null,
-          status:      'active',
-        };
-
-        set({ currentUser: safeUser, loginError: null });
-        return true;
       },
 
-      logout: () => set({ currentUser: null }),
+      logout: () => {
+        localApi.auth.signOut();
+        set({ currentUser: null });
+      },
       clearError: () => set({ loginError: null }),
       updateUser: (updates) => set(state => ({ currentUser: { ...state.currentUser, ...updates } })),
 
@@ -141,3 +110,4 @@ const useAuthStore = create(
 );
 
 export default useAuthStore;
+
