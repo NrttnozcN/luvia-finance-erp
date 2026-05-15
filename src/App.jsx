@@ -119,17 +119,28 @@ const App = () => {
 
   const fetchUpcomingAlerts = async () => {
     if (!cid) return;
+    const future60 = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0];
+    const future30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+
     const { data: compVehs } = await supabase.from('vehicles').select('id').eq('company_id', cid);
     const vIds = (compVehs || []).map(v => v.id);
-    if (!vIds.length) { setUpcomingAlerts([]); return; }
-    const future = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0];
-    const [{ data: insps }, { data: insurs }] = await Promise.all([
-      supabase.from('vehicle_inspections').select('id, type, expiry_date, vehicles(plate)').in('vehicle_id', vIds).not('expiry_date', 'is', null).lte('expiry_date', future).order('expiry_date').limit(10),
-      supabase.from('vehicle_insurances').select('id, insurance_type, expiry_date, company, vehicles(plate)').in('vehicle_id', vIds).not('expiry_date', 'is', null).lte('expiry_date', future).order('expiry_date').limit(10),
+
+    const vQuery = vIds.length
+      ? [
+          supabase.from('vehicle_inspections').select('id, type, expiry_date, vehicles(plate)').in('vehicle_id', vIds).not('expiry_date', 'is', null).lte('expiry_date', future60).order('expiry_date').limit(10),
+          supabase.from('vehicle_insurances').select('id, insurance_type, expiry_date, company, vehicles(plate)').in('vehicle_id', vIds).not('expiry_date', 'is', null).lte('expiry_date', future60).order('expiry_date').limit(10),
+        ]
+      : [Promise.resolve({ data: [] }), Promise.resolve({ data: [] })];
+
+    const [{ data: insps }, { data: insurs }, { data: empDocs }] = await Promise.all([
+      ...vQuery,
+      supabase.from('employee_documents').select('id, doc_type, file_name, expiry_date, employees(full_name)').eq('company_id', cid).not('expiry_date', 'is', null).lte('expiry_date', future30).order('expiry_date').limit(10),
     ]);
+
     const items = [
       ...(insps || []).map(i => ({ id: `i-${i.id}`, category: 'Muayene', label: `${i.type} — ${i.vehicles?.plate || ''}`, expiry: i.expiry_date, days: daysUntil(i.expiry_date) })),
       ...(insurs || []).map(i => ({ id: `s-${i.id}`, category: 'Sigorta', label: `${i.insurance_type}${i.company ? ' (' + i.company + ')' : ''} — ${i.vehicles?.plate || ''}`, expiry: i.expiry_date, days: daysUntil(i.expiry_date) })),
+      ...(empDocs || []).map(d => ({ id: `d-${d.id}`, category: 'Personel Belgesi', label: `${d.doc_type} — ${d.employees?.full_name || ''}`, expiry: d.expiry_date, days: daysUntil(d.expiry_date) })),
     ].sort((a, b) => a.days - b.days);
     setUpcomingAlerts(items);
   };
@@ -398,7 +409,7 @@ const App = () => {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 {upcomingAlerts.length === 0 ? (
-                  <p style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>Yaklaşan muayene veya sigorta yok.</p>
+                  <p style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>Yaklaşan uyarı bulunmuyor.</p>
                 ) : upcomingAlerts.slice(0, 4).map(a => (
                   <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.8rem 1rem', borderRadius: '12px', background: a.days < 0 ? 'rgba(244,63,94,0.05)' : a.days <= 7 ? 'rgba(245,158,11,0.05)' : '#f8fafc' }}>
                     <div style={{ width: '38px', height: '38px', borderRadius: '11px', background: a.days < 0 ? 'rgba(244,63,94,0.12)' : a.days <= 7 ? 'rgba(245,158,11,0.12)' : 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

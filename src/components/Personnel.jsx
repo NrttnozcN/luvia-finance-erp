@@ -20,7 +20,8 @@ const DEPARTMENTS  = ['Operasyon', 'Muhasebe', 'İnsan Kaynakları', 'Lojistik',
 const EMP_STATUSES = ['Aktif', 'Pasif', 'İzinli', 'Çıkış Yaptı'];
 const LEAVE_TYPES  = ['Yıllık', 'Mazeret', 'Ücretsiz', 'Hastalık', 'Doğum', 'Babalık'];
 const EXPENSE_CATS = ['Yol', 'Yemek', 'Konaklama', 'Yakıt', 'Temsil', 'Diğer'];
-const DOC_TYPES    = ['İş Sözleşmesi', 'Nüfus Cüzdanı', 'Diploma', 'İkametgah', 'Adli Sicil', 'Sağlık Raporu', 'Diğer'];
+const DOC_TYPES    = ['İş Sözleşmesi', 'Nüfus Cüzdanı', 'Diploma', 'İkametgah', 'Adli Sicil', 'Sağlık Raporu', 'Ehliyet', 'SRC Belgesi', 'Psikoteknik', 'Mesleki Yeterlilik (MYK)', 'Taşıt Kartı', 'Diğer'];
+const EXPIRY_DOC_TYPES = ['Ehliyet', 'SRC Belgesi', 'Psikoteknik', 'Mesleki Yeterlilik (MYK)', 'Taşıt Kartı', 'Sağlık Raporu'];
 const MONTH_NAMES  = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
 // SGK 2024 oranları
@@ -591,23 +592,44 @@ const LeaveTab = ({ employee }) => {
 };
 
 // ─── Bordro Tab ───────────────────────────────────────────────────────────────
+const countWorkdays = (y, m) => {
+  let n = 0; const d = new Date(y, m - 1, 1);
+  while (d.getMonth() === m - 1) { const w = d.getDay(); if (w && w < 6) n++; d.setDate(d.getDate() + 1); }
+  return n;
+};
+
 const BordroTab = ({ cid }) => {
   const today = new Date();
   const [employees, setEmployees] = useState([]);
   const [selected, setSelected]   = useState('');
   const [year, setYear]   = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
-  const [history, setHistory] = useState([]);
-  const [saving, setSaving]   = useState(false);
-  const [notes, setNotes]     = useState('');
+  const [history, setHistory]     = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [attLoading, setAttLoading] = useState(false);
+  const [kasalar, setKasalar]     = useState([]);
+  const [saving, setSaving]       = useState(false);
+  const [notes, setNotes]         = useState('');
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [paySource, setPaySource] = useState({ type: 'Kasa', kasaId: '', bankName: '' });
 
   useEffect(() => {
     supabase.from('employees').select('id, full_name, job_title, salary').eq('company_id', cid).eq('status', 'Aktif').order('full_name')
       .then(({ data }) => setEmployees(data || []));
+    supabase.from('kasalar').select('id, name').eq('company_id', cid)
+      .then(({ data }) => { const ks = data || []; setKasalar(ks); if (ks.length) setPaySource(p => ({ ...p, kasaId: ks[0].id })); });
   }, [cid]);
 
   const person = employees.find(e => e.id === selected);
-  const calc   = person ? calcBordroFromNet(person.salary) : null;
+
+  useEffect(() => {
+    if (!selected) { setAttendance([]); return; }
+    setAttLoading(true);
+    const from = `${year}-${String(month).padStart(2,'0')}-01`;
+    const to   = `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`;
+    supabase.from('employee_attendance').select('status').eq('employee_id', selected).gte('date', from).lte('date', to)
+      .then(({ data }) => { setAttendance(data || []); setAttLoading(false); });
+  }, [selected, year, month]);
 
   const fetchHistory = useCallback(async () => {
     if (!selected) return;
@@ -617,19 +639,44 @@ const BordroTab = ({ cid }) => {
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
-  const handleSave = async () => {
+  const workdays    = countWorkdays(year, month);
+  const geldiCount  = attendance.filter(a => a.status === 'Geldi').length;
+  const hasAttData  = attendance.length > 0;
+  const attRate     = hasAttData ? Math.min(1, geldiCount / workdays) : 1;
+  const proratedNet = (Number(person?.salary) || 0) * attRate;
+  const calc        = person ? calcBordroFromNet(proratedNet) : null;
+
+  const handleApprove = () => {
     if (!selected || !calc) return;
+    setShowApproveModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
     setSaving(true);
-    const { error } = await supabase.from('employee_payroll').upsert({
-      employee_id: selected, company_id: cid,
-      period_year: year, period_month: month,
-      gross_salary: calc.gross, sgk_employee: calc.sgkW, sgk_employer: calc.sgkE,
-      unemployment_employee: calc.unemW, unemployment_employer: calc.unemE,
-      income_tax: calc.incomeTax, stamp_tax: calc.stampTax, net_salary: calc.net,
-      notes: notes || null, status: 'Onaylı',
-    }, { onConflict: 'employee_id,period_year,period_month' });
+    const accountName = paySource.type === 'Kasa'
+      ? (kasalar.find(k => k.id === paySource.kasaId)?.name || 'Kasa')
+      : (paySource.bankName || 'Banka');
+    const [{ error: pe }, { error: te }] = await Promise.all([
+      supabase.from('employee_payroll').upsert({
+        employee_id: selected, company_id: cid,
+        period_year: year, period_month: month,
+        gross_salary: calc.gross, sgk_employee: calc.sgkW, sgk_employer: calc.sgkE,
+        unemployment_employee: calc.unemW, unemployment_employer: calc.unemE,
+        income_tax: calc.incomeTax, stamp_tax: calc.stampTax, net_salary: calc.net,
+        notes: notes || null, status: 'Onaylı',
+        attendance_days: geldiCount, work_days: workdays,
+      }, { onConflict: 'employee_id,period_year,period_month' }),
+      supabase.from('finance_transactions').insert({
+        company_id: cid, type: 'Ödeme',
+        account_type: paySource.type, account_name: accountName,
+        amount: calc.net,
+        description: `Personel Maaş Ödemesi — ${person.full_name} (${MONTH_NAMES[month-1]} ${year})`,
+        date: new Date().toISOString().split('T')[0],
+      }),
+    ]);
     setSaving(false);
-    if (error) { alert(error.message); return; }
+    if (pe) { alert(pe.message); return; }
+    setShowApproveModal(false);
     setNotes('');
     fetchHistory();
   };
@@ -637,16 +684,16 @@ const BordroTab = ({ cid }) => {
   const exportCSV = () => {
     if (!calc || !person) return;
     const rows = [
-      ['BORDRO FİŞİ', ''], ['Personel', person.full_name], ['Dönem', `${MONTH_NAMES[month-1]} ${year}`], ['', ''],
-      ['Brüt Maaş', `₺${fmt(calc.gross)}`],
+      ['BORDRO FİŞİ', ''], ['Personel', person.full_name], ['Dönem', `${MONTH_NAMES[month-1]} ${year}`],
+      ['Puantaj', `${geldiCount}/${workdays} gün`], ['Puantaj Oranı', `%${(attRate*100).toFixed(1)}`], ['', ''],
+      ['Kayıtlı Net Maaş', `₺${fmt(person.salary)}`],
+      ['Puantaja Göre Net', `₺${fmt(proratedNet)}`],
+      ['Hesaplanan Brüt', `₺${fmt(calc.gross)}`],
       [`SGK İşçi (%${(SGK_WORKER*100).toFixed(0)})`, `-₺${fmt(calc.sgkW)}`],
-      [`İşsizlik İşçi (%${(UNEMPLOYMENT_WORKER*100).toFixed(0)})`, `-₺${fmt(calc.unemW)}`],
-      ['Gelir Vergisi Matrahı', `₺${fmt(calc.taxBase)}`],
+      ['İşsizlik İşçi', `-₺${fmt(calc.unemW)}`],
       ['Gelir Vergisi', `-₺${fmt(calc.incomeTax)}`],
-      [`Damga Vergisi`, `-₺${fmt(calc.stampTax)}`],
-      ['NET MAAŞ', `₺${fmt(calc.net)}`], ['', ''],
-      [`SGK İşveren (%${(SGK_EMPLOYER*100).toFixed(1)})`, `₺${fmt(calc.sgkE)}`],
-      [`İşsizlik İşveren (%${(UNEMPLOYMENT_EMP*100).toFixed(0)})`, `₺${fmt(calc.unemE)}`],
+      ['Damga Vergisi', `-₺${fmt(calc.stampTax)}`],
+      ['NET ÖDENECEK', `₺${fmt(calc.net)}`], ['', ''],
       ['TOPLAM İŞVEREN MALİYETİ', `₺${fmt(calc.employerCost)}`],
     ];
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
@@ -686,26 +733,54 @@ const BordroTab = ({ cid }) => {
         </div>
       ) : calc && (
         <>
+          {/* Puantaj Özeti */}
+          <div style={{ marginBottom: '1.5rem', padding: '1.25rem 1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)', border: '1px solid #bae6fd', display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#0ea5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <ClipboardList size={20} color="white" />
+              </div>
+              <div>
+                <p style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Puantaj — {MONTH_NAMES[month-1]} {year}</p>
+                <p style={{ fontWeight: '800', fontSize: '1.15rem', color: '#0c4a6e', lineHeight: 1 }}>{attLoading ? '…' : `${geldiCount} / ${workdays} gün`}</p>
+              </div>
+            </div>
+            <div style={{ width: '1px', height: '36px', background: '#bae6fd', flexShrink: 0 }} />
+            <div>
+              <p style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: '600', marginBottom: '2px' }}>Devam Oranı</p>
+              <p style={{ fontWeight: '800', fontSize: '1rem', color: '#0c4a6e' }}>{hasAttData ? `%${(attRate * 100).toFixed(1)}` : '— '}<span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#0284c7' }}>{!hasAttData && '(kayıt yok)'}</span></p>
+            </div>
+            <div style={{ width: '1px', height: '36px', background: '#bae6fd', flexShrink: 0 }} />
+            <div>
+              <p style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: '600', marginBottom: '2px' }}>Puantaja Göre Net</p>
+              <p style={{ fontWeight: '800', fontSize: '1rem', color: '#0c4a6e' }}>₺{fmt(proratedNet)}</p>
+            </div>
+            {!hasAttData && (
+              <p style={{ fontSize: '0.78rem', color: '#0369a1', marginLeft: 'auto', fontStyle: 'italic' }}>Bu ay puantaj kaydı yok — tam maaş baz alınıyor.</p>
+            )}
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
             <div className="card">
               <p style={{ fontWeight: '800', fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '1.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>İşçi — {person.full_name}</p>
-              <BRow label="Kayıtlı Net Maaş"                                    value={`₺${fmt(person.salary)}`}     muted />
-              <BRow label="Hesaplanan Brüt Maaş"                                value={`₺${fmt(calc.gross)}`}        bold />
-              <BRow label={`(-) SGK İşçi (%${(SGK_WORKER*100).toFixed(0)})`}    value={`-₺${fmt(calc.sgkW)}`}       neg />
-              <BRow label={`(-) İşsizlik İşçi (%${(UNEMPLOYMENT_WORKER*100).toFixed(0)})`} value={`-₺${fmt(calc.unemW)}`} neg />
-              <BRow label="Gelir Vergisi Matrahı"                               value={`₺${fmt(calc.taxBase)}`}      muted />
-              <BRow label="(-) Gelir Vergisi"                                   value={`-₺${fmt(calc.incomeTax)}`}   neg />
-              <BRow label={`(-) Damga Vergisi (%${(STAMP_TAX_RATE*100).toFixed(3)})`} value={`-₺${fmt(calc.stampTax)}`} neg />
+              <BRow label="Kayıtlı Net Maaş"    value={`₺${fmt(person.salary)}`}   muted />
+              {hasAttData && <BRow label={`Puantaj (${geldiCount}/${workdays} gün)`} value={`%${(attRate*100).toFixed(1)}`} muted />}
+              <BRow label="Puantaya Göre Net"    value={`₺${fmt(proratedNet)}`}     bold />
+              <BRow label="Hesaplanan Brüt"      value={`₺${fmt(calc.gross)}`}      />
+              <BRow label={`(-) SGK İşçi (%${(SGK_WORKER*100).toFixed(0)})`}        value={`-₺${fmt(calc.sgkW)}`}   neg />
+              <BRow label="(-) İşsizlik İşçi"   value={`-₺${fmt(calc.unemW)}`}     neg />
+              <BRow label="Gelir V. Matrahı"     value={`₺${fmt(calc.taxBase)}`}    muted />
+              <BRow label="(-) Gelir Vergisi"    value={`-₺${fmt(calc.incomeTax)}`} neg />
+              <BRow label="(-) Damga Vergisi"    value={`-₺${fmt(calc.stampTax)}`}  neg />
               <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '2px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: '700' }}>NET MAAŞ</span>
+                <span style={{ fontWeight: '700' }}>NET ÖDENECEK</span>
                 <span style={{ fontWeight: '900', fontSize: '1.4rem', color: '#16a34a' }}>₺{fmt(calc.net)}</span>
               </div>
             </div>
             <div className="card" style={{ background: 'var(--bg-main)' }}>
               <p style={{ fontWeight: '800', fontSize: '0.85rem', color: 'var(--text-dim)', marginBottom: '1.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>İşveren Maliyeti</p>
-              <BRow label="Brüt Maaş"                                                  value={`₺${fmt(calc.gross)}`} />
-              <BRow label={`(+) SGK İşveren (%${(SGK_EMPLOYER*100).toFixed(1)})`}       value={`+₺${fmt(calc.sgkE)}`} />
-              <BRow label={`(+) İşsizlik İşveren (%${(UNEMPLOYMENT_EMP*100).toFixed(0)})`} value={`+₺${fmt(calc.unemE)}`} />
+              <BRow label="Brüt Maaş"                                                              value={`₺${fmt(calc.gross)}`} />
+              <BRow label={`(+) SGK İşveren (%${(SGK_EMPLOYER*100).toFixed(1)})`}                 value={`+₺${fmt(calc.sgkE)}`} />
+              <BRow label={`(+) İşsizlik İşveren (%${(UNEMPLOYMENT_EMP*100).toFixed(0)})`}        value={`+₺${fmt(calc.unemE)}`} />
               <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '2px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: '700' }}>TOPLAM MALİYET</span>
                 <span style={{ fontWeight: '900', fontSize: '1.4rem', color: 'var(--danger)' }}>₺{fmt(calc.employerCost)}</span>
@@ -713,32 +788,91 @@ const BordroTab = ({ cid }) => {
               <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.5rem' }}>* 2024 SGK oranları ile hesaplanmıştır.</p>
             </div>
           </div>
+
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
               <div style={{ flex: 1 }}><label className="form-label">Not</label><input className="input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Bordro notu…" /></div>
-              <button className="btn btn-outline" onClick={exportCSV}><Download size={16} /> CSV</button>
-              <button className="btn btn-primary" onClick={handleSave} disabled={saving}><Save size={16} /> {saving ? 'Kaydediliyor…' : `${MONTH_NAMES[month-1]} ${year} Kaydet`}</button>
+              <button className="btn btn-ghost" onClick={exportCSV}><Download size={16} /> CSV</button>
+              <button onClick={handleApprove} disabled={saving}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.4rem', borderRadius: '12px', background: 'linear-gradient(135deg, #16a34a, #15803d)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '0.9rem', boxShadow: '0 4px 14px rgba(22,163,74,0.35)' }}>
+                <Save size={16} /> {MONTH_NAMES[month-1]} {year} — Onayla
+              </button>
             </div>
           </div>
+
           {history.length > 0 && (
             <div className="card">
               <p style={{ fontWeight: '700', marginBottom: '1rem' }}>Geçmiş Bordrolar</p>
               <table style={{ width: '100%' }}>
-                <thead><tr>{['Dönem','Brüt','SGK İşçi','Gelir V.','Damga V.','Net Maaş','Durum'].map(h => <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: '700' }}>{h}</th>)}</tr></thead>
+                <thead>
+                  <tr>{['Dönem','Puantaj','Brüt','Net Ödenecek','Durum'].map(h => <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: '700' }}>{h}</th>)}</tr>
+                </thead>
                 <tbody>
                   {history.map(p => (
                     <tr key={p.id} style={{ borderTop: '1px solid var(--bg-main)' }}>
                       <td style={{ padding: '0.75rem', fontWeight: '600' }}>{MONTH_NAMES[p.period_month-1]} {p.period_year}</td>
+                      <td style={{ padding: '0.75rem', fontSize: '0.82rem', color: 'var(--text-dim)' }}>{p.attendance_days != null ? `${p.attendance_days}/${p.work_days} gün` : '—'}</td>
                       <td style={{ padding: '0.75rem' }}>₺{fmt(p.gross_salary)}</td>
-                      <td style={{ padding: '0.75rem', color: 'var(--danger)' }}>-₺{fmt(p.sgk_employee)}</td>
-                      <td style={{ padding: '0.75rem', color: 'var(--danger)' }}>-₺{fmt(p.income_tax)}</td>
-                      <td style={{ padding: '0.75rem', color: 'var(--danger)' }}>-₺{fmt(p.stamp_tax)}</td>
                       <td style={{ padding: '0.75rem', fontWeight: '700', color: '#16a34a' }}>₺{fmt(p.net_salary)}</td>
                       <td style={{ padding: '0.75rem' }}><span style={{ padding: '0.15rem 0.5rem', borderRadius: '20px', fontSize: '0.72rem', fontWeight: '700', background: p.status === 'Onaylı' ? '#dcfce7' : '#fef3c7', color: p.status === 'Onaylı' ? '#16a34a' : '#d97706' }}>{p.status}</span></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Ödeme Kaynağı Onay Modalı */}
+          {showApproveModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+              <div style={{ background: 'white', borderRadius: '20px', width: '100%', maxWidth: '440px', boxShadow: '0 24px 60px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+                <div style={{ padding: '1.5rem 1.75rem', borderBottom: '1px solid var(--bg-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.1rem', marginBottom: '3px' }}>Ödeme Kaynağı Seç</h2>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{person.full_name} · {MONTH_NAMES[month-1]} {year}</p>
+                  </div>
+                  <button onClick={() => setShowApproveModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', marginTop: '2px' }}><X size={20} /></button>
+                </div>
+                <div style={{ padding: '1.5rem 1.75rem' }}>
+                  <div style={{ padding: '1rem 1.25rem', background: '#f0fdf4', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#15803d', fontWeight: '600' }}>Net Ödenecek</span>
+                    <span style={{ fontWeight: '900', fontSize: '1.3rem', color: '#16a34a' }}>₺{fmt(calc.net)}</span>
+                  </div>
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label">Ödeme Türü</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {['Kasa', 'Banka'].map(t => (
+                        <button key={t} onClick={() => setPaySource(p => ({ ...p, type: t }))}
+                          style={{ flex: 1, padding: '0.65rem', borderRadius: '10px', border: `2px solid ${paySource.type === t ? 'var(--primary)' : 'var(--border)'}`, background: paySource.type === t ? 'var(--primary-light)' : 'transparent', fontWeight: '700', cursor: 'pointer', color: paySource.type === t ? 'var(--primary)' : 'var(--text-muted)', fontSize: '0.88rem', transition: 'all 0.15s' }}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {paySource.type === 'Kasa' ? (
+                    kasalar.length > 0 ? (
+                      <div>
+                        <label className="form-label">Kasa Seç</label>
+                        <select className="input" value={paySource.kasaId} onChange={e => setPaySource(p => ({ ...p, kasaId: e.target.value }))}>
+                          {kasalar.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
+                        </select>
+                      </div>
+                    ) : <p style={{ fontSize: '0.82rem', color: 'var(--text-dim)', padding: '0.5rem 0' }}>Tanımlı kasa bulunamadı. Kasa modülünden ekleyebilirsiniz.</p>
+                  ) : (
+                    <div>
+                      <label className="form-label">Banka / Hesap Adı</label>
+                      <input className="input" value={paySource.bankName} onChange={e => setPaySource(p => ({ ...p, bankName: e.target.value }))} placeholder="Örn: Ziraat Bankası — Maaş Hesabı" />
+                    </div>
+                  )}
+                </div>
+                <div style={{ padding: '1rem 1.75rem', borderTop: '1px solid var(--bg-main)', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button className="btn btn-ghost" onClick={() => setShowApproveModal(false)}>İptal</button>
+                  <button onClick={handleConfirmApprove} disabled={saving}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.4rem', borderRadius: '12px', background: 'linear-gradient(135deg, #16a34a, #15803d)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '0.9rem', boxShadow: '0 4px 14px rgba(22,163,74,0.3)' }}>
+                    <Save size={15} /> {saving ? 'Kaydediliyor…' : 'Onayla & Kaydet'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </>
@@ -950,7 +1084,7 @@ const BelgelerTab = ({ cid }) => {
   const [docs, setDocs]           = useState([]);
   const [loading, setLoading]     = useState(false);
   const [saving, setSaving]       = useState(false);
-  const [form, setForm] = useState({ doc_type: 'İş Sözleşmesi', name: '', notes: '' });
+  const [form, setForm] = useState({ doc_type: 'İş Sözleşmesi', name: '', notes: '', expiry_date: '' });
 
   useEffect(() => {
     supabase.from('employees').select('id, full_name').eq('company_id', cid).order('full_name').then(({ data }) => setEmployees(data || []));
@@ -969,10 +1103,10 @@ const BelgelerTab = ({ cid }) => {
   const handleSave = async () => {
     if (!form.name.trim()) { alert('Belge adı zorunludur.'); return; }
     setSaving(true);
-    const { error } = await supabase.from('employee_documents').insert({ employee_id: selected, company_id: cid, doc_type: form.doc_type, file_name: form.name.trim(), notes: form.notes || null });
+    const { error } = await supabase.from('employee_documents').insert({ employee_id: selected, company_id: cid, doc_type: form.doc_type, file_name: form.name.trim(), notes: form.notes || null, expiry_date: form.expiry_date || null });
     setSaving(false);
     if (error) { alert(error.message); return; }
-    setForm(f => ({ ...f, name: '', notes: '' }));
+    setForm(f => ({ ...f, name: '', notes: '', expiry_date: '' }));
     fetchDocs();
   };
 
@@ -995,9 +1129,10 @@ const BelgelerTab = ({ cid }) => {
           <div className="card" style={{ background: 'var(--bg-main)', marginBottom: '1.5rem' }}>
             <p style={{ fontWeight: '700', fontSize: '0.88rem', marginBottom: '1rem' }}>Yeni Belge Ekle</p>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <div><label className="form-label">Belge Türü</label><select className="input" value={form.doc_type} onChange={e => setForm(f => ({ ...f, doc_type: e.target.value }))} style={{ width: '180px' }}>{DOC_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
-              <div style={{ flex: 1, minWidth: '200px' }}><label className="form-label">Belge Adı *</label><input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Örn: 2024 İş Sözleşmesi" /></div>
-              <div style={{ flex: 1, minWidth: '180px' }}><label className="form-label">Not</label><input className="input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Opsiyonel…" /></div>
+              <div><label className="form-label">Belge Türü</label><select className="input" value={form.doc_type} onChange={e => setForm(f => ({ ...f, doc_type: e.target.value }))} style={{ width: '190px' }}>{DOC_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
+              <div style={{ flex: 1, minWidth: '200px' }}><label className="form-label">Belge Adı *</label><input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Örn: 2024 Ehliyet" /></div>
+              <div><label className="form-label">Son Geçerlilik Tarihi</label><input className="input" type="date" value={form.expiry_date} onChange={e => setForm(f => ({ ...f, expiry_date: e.target.value }))} style={{ width: '170px' }} /></div>
+              <div style={{ minWidth: '160px' }}><label className="form-label">Not</label><input className="input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Opsiyonel…" /></div>
               <button className="btn btn-primary" onClick={handleSave} disabled={saving}><Plus size={15} /> {saving ? 'Kaydediliyor…' : 'Kaydet'}</button>
             </div>
           </div>
@@ -1005,18 +1140,28 @@ const BelgelerTab = ({ cid }) => {
           : docs.length === 0 ? <div style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '2rem' }}>Henüz belge kaydı yok.</div>
           : (
             <div className="card" style={{ padding: 0 }}>
-              {docs.map((d, i) => (
-                <div key={d.id} style={{ display: 'flex', alignItems: 'center', padding: '0.85rem 1.25rem', borderBottom: i < docs.length - 1 ? '1px solid var(--bg-main)' : 'none', gap: '1rem' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#eff6ff', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><FileText size={18} /></div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: '600', fontSize: '0.9rem' }}>{d.file_name}</p>
-                    {d.notes && <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginTop: '2px' }}>{d.notes}</p>}
+              {docs.map((d, i) => {
+                const daysLeft = d.expiry_date ? Math.ceil((new Date(d.expiry_date) - new Date()) / 86400000) : null;
+                const expiryColor = daysLeft === null ? null : daysLeft <= 0 ? '#dc2626' : daysLeft <= 30 ? '#d97706' : '#16a34a';
+                const expiryBg    = daysLeft === null ? null : daysLeft <= 0 ? '#fee2e2' : daysLeft <= 30 ? '#fef3c7' : '#dcfce7';
+                return (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', padding: '0.85rem 1.25rem', borderBottom: i < docs.length - 1 ? '1px solid var(--bg-main)' : 'none', gap: '1rem' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: expiryBg || '#eff6ff', color: expiryColor || '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><FileText size={18} /></div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontWeight: '600', fontSize: '0.9rem' }}>{d.file_name}</p>
+                      {d.notes && <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginTop: '2px' }}>{d.notes}</p>}
+                    </div>
+                    <span style={{ padding: '0.2rem 0.6rem', borderRadius: '20px', fontSize: '0.72rem', fontWeight: '700', background: '#f1f5f9', color: '#475569' }}>{d.doc_type}</span>
+                    {d.expiry_date && (
+                      <span style={{ padding: '0.2rem 0.65rem', borderRadius: '20px', fontSize: '0.72rem', fontWeight: '700', background: expiryBg, color: expiryColor, whiteSpace: 'nowrap' }}>
+                        {daysLeft <= 0 ? 'Süresi doldu' : daysLeft <= 30 ? `${daysLeft} gün kaldı` : new Date(d.expiry_date + 'T00:00:00').toLocaleDateString('tr-TR')}
+                      </span>
+                    )}
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{d.created_at ? new Date(d.created_at).toLocaleDateString('tr-TR') : '—'}</span>
+                    <button onClick={() => handleDelete(d.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                   </div>
-                  <span style={{ padding: '0.2rem 0.6rem', borderRadius: '20px', fontSize: '0.72rem', fontWeight: '700', background: '#f1f5f9', color: '#475569' }}>{d.doc_type}</span>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{d.created_at ? new Date(d.created_at).toLocaleDateString('tr-TR') : '—'}</span>
-                  <button onClick={() => handleDelete(d.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}><Trash2 size={14} /></button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
@@ -1332,9 +1477,10 @@ const StatCard = ({ label, value, color }) => (
 );
 
 const MiniCard = ({ label, value, color }) => (
-  <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: '10px' }}>
-    <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginBottom: '4px' }}>{label}</p>
-    <p style={{ fontWeight: '800', fontSize: '1rem', color }}>{value}</p>
+  <div style={{ padding: '1.1rem 1.25rem', background: 'white', borderRadius: '14px', border: '1px solid var(--border)', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '50px', height: '50px', borderRadius: '50%', background: color, opacity: 0.08 }} />
+    <p style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', marginBottom: '0.4rem' }}>{label}</p>
+    <p style={{ fontWeight: '800', fontSize: '1.05rem', color }}>{value}</p>
   </div>
 );
 
