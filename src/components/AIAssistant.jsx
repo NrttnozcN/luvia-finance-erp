@@ -47,35 +47,44 @@ const AIAssistant = () => {
 
   // Frontend içinde çalışan veritabanı okuma aracı (Doğrudan Supabase'den okur)
   const getExpensesSummary = async ({ month, year }) => {
-    if (!companyId) return { error: "Oturum açık değil veya şirket kimliği yok." };
+    if (!companyId) return { error: "Oturum açık değil." };
     
-    // Basit bir yaklaşım: Tüm o ayın giderlerini çekip frontend'de toplarız
-    const startDate = new Date(year, month - 1, 1).toISOString();
-    const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+    const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
+    const endDate   = new Date(year, month, 0).toISOString().split('T')[0]; // Ayın son günü
 
     const { data, error } = await supabase
-      .from('expenses')
-      .select('category, amount')
+      .from('finance_transactions')
+      .select('type, category, amount, date, description')
       .eq('company_id', companyId)
       .gte('date', startDate)
       .lte('date', endDate);
 
     if (error) {
-      console.error(error);
-      return { error: "Veri çekilirken hata oluştu." };
+      console.error('Supabase error:', error);
+      return { error: `Veri çekilirken hata: ${error.message}` };
     }
 
     if (!data || data.length === 0) {
-      return { message: "Bu aya ait gider bulunamadı." };
+      return { message: `${month}/${year} dönemine ait gelir/gider hareketi bulunamadı.` };
     }
 
-    // Kategorilere göre grupla ve topla
-    const summary = data.reduce((acc, curr) => {
-      acc[curr.category] = (acc[curr.category] || 0) + Number(curr.amount);
+    // Gider ve geliri ayır, kategoriye göre grupla
+    const giderler = data.filter(t => t.type?.includes('Gider') || t.type === 'Ödeme');
+    const gelirler = data.filter(t => t.type?.includes('Gelir') || t.type === 'Tahsilat');
+
+    const grupla = (list) => list.reduce((acc, curr) => {
+      const cat = curr.category || 'Genel';
+      acc[cat] = (acc[cat] || 0) + Number(curr.amount || 0);
       return acc;
     }, {});
 
-    return Object.entries(summary).map(([category, total]) => ({ category, total }));
+    return {
+      donem: `${month}/${year}`,
+      toplam_gider: giderler.reduce((s,t) => s + Number(t.amount||0), 0),
+      toplam_gelir: gelirler.reduce((s,t) => s + Number(t.amount||0), 0),
+      gider_kategorileri: Object.entries(grupla(giderler)).map(([k,v]) => ({ kategori: k, toplam: v })),
+      gelir_kategorileri: Object.entries(grupla(gelirler)).map(([k,v]) => ({ kategori: k, toplam: v })),
+    };
   };
 
   const toolsFunctions = {
