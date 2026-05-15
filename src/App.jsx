@@ -247,7 +247,7 @@ const App = () => {
 
   const renderDashboard = () => {
     const fmt = (n) => `₺${Number(n || 0).toLocaleString('tr-TR')}`;
-    const card = (style = {}) => ({
+    const cardStyle = (style = {}) => ({
       background: 'white', borderRadius: '20px', padding: '1.75rem',
       boxShadow: '0 4px 24px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9',
       ...style,
@@ -264,17 +264,17 @@ const App = () => {
         </header>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-4" style={{ marginBottom: '1.75rem' }}>
+        <div className="grid grid-cols-4 dashboard-stats-row" style={{ marginBottom: '1.75rem' }}>
           <DashStatCard title="Toplam Ciro"      value={fmt(stats.totalSales)}    sub="Tüm satış faturaları"  icon={<TrendingUp size={20} />}  gradient="linear-gradient(135deg,#6366F1,#8B5CF6)" />
           <DashStatCard title="Aktif Filo"        value={stats.vehicleCount}       sub="Kayıtlı araç sayısı"   icon={<Truck size={20} />}       gradient="linear-gradient(135deg,#10B981,#059669)" />
           <DashStatCard title="Akaryakıt Gideri"  value={fmt(stats.fuelCost)}      sub="Toplam yakıt maliyeti" icon={<FuelIcon size={20} />}    gradient="linear-gradient(135deg,#F43F5E,#E11D48)" />
-          <DashStatCard title="Cari Hesaplar"     value={stats.customerCount}      sub="Aktif cari sayısı"     icon={<Users size={20} />}       gradient="linear-gradient(135deg,#1E293B,#334155)" />
+          <DashStatCard title="Cari Hesaplar" value={stats.customerCount} sub="Aktif cari sayısı" icon={<Users size={20} />} gradient="linear-gradient(135deg,#F59E0B,#D97706)" />
         </div>
 
         {/* Charts Row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
           {/* Area Chart */}
-          <div style={card()}>
+          <div style={cardStyle()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
                 <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '2px' }}>Gelir / Gider Trendi</h3>
@@ -312,7 +312,7 @@ const App = () => {
           </div>
 
           {/* Pie Chart */}
-          <div style={card()}>
+          <div style={cardStyle()}>
             <div style={{ marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '2px' }}>Gider Dağılımı</h3>
               <p style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Kategori bazlı maliyet analizi</p>
@@ -350,7 +350,7 @@ const App = () => {
           {/* Left: Son İşlemler + Uyarılar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {/* Son İşlemler */}
-            <div style={card()}>
+            <div style={cardStyle()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '2px' }}>Son İşlemler</h3>
@@ -388,7 +388,7 @@ const App = () => {
             </div>
 
             {/* Yaklaşan Uyarılar */}
-            <div style={card()}>
+            <div style={cardStyle()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '2px' }}>Yaklaşan Muayene & Sigorta</h3>
@@ -419,7 +419,7 @@ const App = () => {
 
           {/* Right: Hızlı İşlemler + Destek */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={card()}>
+            <div style={cardStyle()}>
               <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1E293B', marginBottom: '1.25rem' }}>Hızlı İşlemler</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 {[
@@ -620,28 +620,22 @@ const App = () => {
 };
 
 const DashStatCard = ({ title, value, sub, icon, gradient }) => (
-  <div style={{ background: gradient, borderRadius: '20px', padding: '1.5rem', boxShadow: '0 8px 24px rgba(0,0,0,0.13)', color: 'white', position: 'relative', overflow: 'hidden' }}>
+  <div className="dash-stat-card" style={{ background: gradient, borderRadius: '20px', padding: '1.5rem', boxShadow: '0 8px 24px rgba(0,0,0,0.13)', color: 'white', position: 'relative', overflow: 'hidden' }}>
     <div style={{ position: 'absolute', top: '-18px', right: '-18px', width: '90px', height: '90px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
     <div style={{ position: 'absolute', bottom: '-25px', right: '18px', width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
     <div style={{ position: 'relative' }}>
       <div style={{ padding: '0.5rem', borderRadius: '11px', background: 'rgba(255,255,255,0.2)', display: 'inline-flex', marginBottom: '1rem' }}>{icon}</div>
       <h3 style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '0.15rem', letterSpacing: '-0.02em' }}>{value}</h3>
-      <p style={{ fontSize: '0.88rem', fontWeight: '700', opacity: 0.9, marginBottom: '2px' }}>{title}</p>
-      <p style={{ fontSize: '0.74rem', opacity: 0.65 }}>{sub}</p>
+      <p style={{ fontSize: '0.88rem', fontWeight: '700', marginBottom: '2px' }}>{title}</p>
+      <p style={{ fontSize: '0.74rem', opacity: 0.85 }}>{sub}</p>
     </div>
   </div>
 );
 
-const StatCard = ({ title, value, trend, positive, icon }) => (
-  <div className="card stat-card">
-    <div className="stat-header">
-      <div className="stat-icon">{icon}</div>
-      <span className={`stat-trend ${positive ? 'up' : 'down'}`}>{trend}</span>
-    </div>
-    <div className="stat-body">
-      <h3 className="stat-value">{value}</h3>
-      <p className="stat-label">{title}</p>
-    </div>
+const StatCard = ({ label, value, color }) => (
+  <div className="card" style={{ borderLeft: `4px solid ${color}` }}>
+    <p style={{ fontSize: '0.82rem', color: 'var(--text-dim)', fontWeight: '600', marginBottom: '0.5rem' }}>{label}</p>
+    <h3 style={{ fontSize: '1.5rem', fontWeight: '800' }}>{value}</h3>
   </div>
 );
 
@@ -677,6 +671,13 @@ const DashboardAction = ({ icon, label, description, onClick }) => (
       <p className="text-muted" style={{ fontSize: '0.8rem' }}>{description}</p>
     </div>
     <ChevronRight size={16} className="text-dim" />
+  </div>
+);
+
+const MiniCard = ({ label, value, color }) => (
+  <div className="card" style={{ borderLeft: `4px solid ${color}`, padding: '1rem' }}>
+    <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{label}</p>
+    <p style={{ fontSize: '1.1rem', fontWeight: '800', color: '#1e293b' }}>{value}</p>
   </div>
 );
 

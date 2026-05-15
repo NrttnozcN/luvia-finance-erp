@@ -387,3 +387,13 @@ tr:hover td {
   /* Yazdır butonunu gizle */
   button[onClick*="print"] { display: none !important; }
 }
+
+/* Dashboard Stat Cards — prevent global h1/h2/h3 color rule from overriding white text */
+.dash-stat-card,
+.dash-stat-card h1,
+.dash-stat-card h2,
+.dash-stat-card h3,
+.dash-stat-card p {
+  color: inherit !important;
+}
+
