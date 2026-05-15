@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables (API anahtarları - asla paylaşmayın!)
+.env
+.env.*
+!.env.example
+luvia-backend/.env
