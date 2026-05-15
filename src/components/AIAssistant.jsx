@@ -5,8 +5,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { supabase } from '../lib/supabase';
 import useAuthStore from '../store/authStore';
 
-// Kendi anahtarınızı buraya güvenle koyabilirsiniz, yerel kullanım içindir.
-const genAI = new GoogleGenerativeAI('AIzaSyCOzr6Ky2-sULC0MIJk4VvDEMa-icIs5j8');
+// API anahtarı artık güvenli bir şekilde Environment Variable'dan okunuyor.
+// Vercel veya yerel ortamda VITE_GEMINI_API_KEY olarak tanımlanmalıdır.
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
 
 const toolsDeclaration = {
   functionDeclarations: [
