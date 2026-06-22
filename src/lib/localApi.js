@@ -1,54 +1,73 @@
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://yqcpvkiqkqdmranngdyv.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_237AuUGPAkPQPQTs8kHZ6g_-1qDWCJl';
-
-// Backend kullanmadan doğrudan Supabase'e bağlanan istemci
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+import { supabase } from './supabase';
 
 export const localApi = {
   auth: {
     signIn: async (identifier, password) => {
       try {
         const cleanId = identifier.trim().toLowerCase();
-        
-        // Supabase profiles tablosundan doğrudan şifre kontrolü (Eski yapı)
-        const { data: users, error } = await supabase
-          .from('profiles')
-          .select('*, companies(name, status, license_end_date)')
-          .or(`username.eq.${cleanId},email.eq.${cleanId}`)
-          .eq('password', password);
 
-        if (error || !users || users.length === 0) {
+        // identifier bir email mi yoksa username mi — username ise önce
+        // gerçek Auth email'ini (gerçek veya sentetik) bulmamız gerekiyor.
+        // Bu lookup, login OLMADAN yapılabilmesi için RLS dışında bırakılan
+        // dar kapsamlı bir RPC üzerinden çalışır (bkz. migrations/003_auth_rls.sql
+        // sonrası eklenecek `resolve_auth_email` fonksiyonu).
+        let authEmail = cleanId;
+        if (!cleanId.includes('@')) {
+          const { data: resolved, error: resolveErr } = await supabase
+            .rpc('resolve_auth_email', { identifier: cleanId });
+          if (resolveErr || !resolved) {
+            return { data: null, error: { error: 'Kullanıcı adı veya şifre hatalı.' } };
+          }
+          authEmail = resolved;
+        }
+
+        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password,
+        });
+
+        if (signInErr || !signInData?.user) {
           return { data: null, error: { error: 'Kullanıcı adı veya şifre hatalı.' } };
         }
 
-        const user = users[0];
-        
-        if (user.companies?.status === 'passive') {
-            return { data: null, error: { error: 'Firmanızın hesabı askıya alınmıştır.' } };
+        const { data: profile, error: profileErr } = await supabase
+          .from('profiles')
+          .select('*, companies(name, status, license_end_date)')
+          .eq('auth_user_id', signInData.user.id)
+          .single();
+
+        if (profileErr || !profile) {
+          await supabase.auth.signOut();
+          return { data: null, error: { error: 'Profil bulunamadı.' } };
+        }
+
+        if (profile.companies?.status === 'passive') {
+          await supabase.auth.signOut();
+          return { data: null, error: { error: 'Firmanızın hesabı askıya alınmıştır.' } };
         }
 
         const safeUser = {
-            id: user.id,
-            full_name: user.full_name,
-            username: user.username,
-            email: user.email,
-            role: user.role,
-            role_id: user.role_id,
-            company_id: user.company_id,
-            companyName: user.companies?.name,
-            permissions: null
+          id: profile.id,
+          full_name: profile.full_name,
+          username: profile.username,
+          email: profile.email,
+          role: profile.role,
+          role_id: profile.role_id,
+          company_id: profile.company_id,
+          companyName: profile.companies?.name,
+          permissions: null,
         };
 
-        localStorage.setItem('luvia_token', 'supabase-direct-mode');
-        return { data: { user: safeUser, token: 'supabase-direct-mode' }, error: null };
+        return { data: { user: safeUser, token: signInData.session.access_token }, error: null };
       } catch (err) {
         return { data: null, error: { error: 'Giriş başarısız' } };
       }
     },
-    signOut: () => localStorage.removeItem('luvia_token'),
-    getUser: async () => ({ data: { user: { id: 'temp' } }, error: null })
+    signOut: () => supabase.auth.signOut(),
+    getUser: async () => {
+      const { data } = await supabase.auth.getUser();
+      return { data: { user: data?.user || null }, error: null };
+    },
   },
   
   // from metodunu doğrudan supabase.from'a yönlendiriyoruz!

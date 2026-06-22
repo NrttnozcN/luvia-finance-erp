@@ -280,16 +280,19 @@ const Definitions = () => {
     const em = userForm.email.trim();
     const pw = userForm.password.trim();
     if (!fn || !un || !em || !pw) { alert('Tüm alanlar zorunludur.'); return; }
-    const { role, role_id } = resolveRoleFields(userForm.roleType);
-    const { error } = await supabase.from('profiles').insert([{
-      full_name: fn, username: un, email: em, password: pw,
-      role, role_id, company_id: cid,
-    }]);
+    const { role } = resolveRoleFields(userForm.roleType);
+    const { error } = await supabase.functions.invoke('create-user', {
+      body: {
+        mode: 'company_user',
+        user: { full_name: fn, username: un, email: em, password: pw },
+        role,
+      },
+    });
     if (error) { alert('Kayıt başarısız: ' + error.message); return; }
     setShowUserModal(false);
     setUserForm({ full_name: '', username: '', email: '', password: '', roleType: 'admin' });
     fetchUsers();
-    alert(`Kullanıcı oluşturuldu!\nKullanıcı Adı: ${un}\nŞifre: ${pw}`);
+    alert(`Kullanıcı oluşturuldu!\nKullanıcı Adı: ${un}`);
   };
 
   const handleEditUser = async () => {

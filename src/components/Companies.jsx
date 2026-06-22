@@ -57,37 +57,27 @@ const Companies = () => {
     if (!validateAdd()) return;
     setSaving(true);
 
-    const { data: company, error: compError } = await supabase
-      .from('companies')
-      .insert([{
-        name: newCompany.name.trim(),
-        tax_no: newCompany.tax_no.trim() || null,
-        address: newCompany.address.trim() || null,
-        phone: newCompany.phone.trim() || null,
-        license_end_date: newCompany.license_end_date || null,
-        status: 'active',
-      }])
-      .select()
-      .single();
+    const { error } = await supabase.functions.invoke('create-user', {
+      body: {
+        mode: 'new_company',
+        company: {
+          name: newCompany.name.trim(),
+          tax_no: newCompany.tax_no.trim() || null,
+          address: newCompany.address.trim() || null,
+          phone: newCompany.phone.trim() || null,
+          license_end_date: newCompany.license_end_date || null,
+        },
+        adminUser: {
+          full_name: newAdmin.full_name.trim(),
+          username: newAdmin.username.trim().toLowerCase(),
+          email: newAdmin.email.trim().toLowerCase() || null,
+          password: newAdmin.password,
+        },
+      },
+    });
 
-    if (compError) {
-      alert('Firma eklenemedi: ' + compError.message);
-      setSaving(false);
-      return;
-    }
-
-    const { error: profError } = await supabase.from('profiles').insert([{
-      full_name: newAdmin.full_name.trim(),
-      username: newAdmin.username.trim().toLowerCase(),
-      email: newAdmin.email.trim().toLowerCase() || null,
-      password: newAdmin.password,
-      role: 'Admin',
-      company_id: company.id
-    }]);
-
-    if (profError) {
-      await supabase.from('companies').delete().eq('id', company.id);
-      alert('Yönetici eklenemedi: ' + profError.message);
+    if (error) {
+      alert('Firma/yönetici oluşturulamadı: ' + error.message);
       setSaving(false);
       return;
     }

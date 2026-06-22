@@ -28,3 +28,8 @@ dist-ssr
 .env.*
 !.env.example
 luvia-backend/.env
+
+.vercel
+
+# Tek seferlik auth migration backfill script'i (service_role key kullanır, asla commit edilmez)
+scripts/auth-migration-backfill.cjs
