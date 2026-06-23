@@ -602,12 +602,6 @@ const LeaveTab = ({ employee }) => {
 };
 
 // ─── Bordro Tab ───────────────────────────────────────────────────────────────
-const countWorkdays = (y, m) => {
-  let n = 0; const d = new Date(y, m - 1, 1);
-  while (d.getMonth() === m - 1) { const w = d.getDay(); if (w && w < 6) n++; d.setDate(d.getDate() + 1); }
-  return n;
-};
-
 const BordroTab = ({ cid }) => {
   const today = new Date();
   const [employees, setEmployees] = useState([]);
